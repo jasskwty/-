@@ -2,7 +2,8 @@
 
 # شاشتي · Shashati
 
-<p align="center"><img src="docs/preview.png" width="100%"></p>
+<p align="center"><img src="docs/home.png" width="100%"></p>
+<p align="center"><img src="docs/saver.png" width="100%"></p>
 
 واجهة رئيسية عربية وشاشة توقف لتلفزيونات **Android TV / Google TV**، ومعها سكربتات تخلي التلفزيون أسرع. وتقدر ترجّع كل شي مثل ما كان.
 
