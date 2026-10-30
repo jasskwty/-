@@ -1,6 +1,5 @@
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item><shape android:shape="oval"><solid android:color="#0B1E33" /><size android:width="96dp" android:height="96dp" /></shape></item>
-    <item android:left="24dp" android:top="24dp" android:right="24dp" android:bottom="24dp">
-        <shape android:shape="oval"><solid android:color="#E8B54A" /></shape>
-    </item>
-</layer-list>
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="96dp" android:height="96dp" android:viewportWidth="96" android:viewportHeight="96">
+    <path android:fillColor="#0B1E33" android:pathData="M24,0h48a24,24 0 0,1 24,24v48a24,24 0 0,1 -24,24h-48a24,24 0 0,1 -24,-24v-48a24,24 0 0,1 24,-24z" />
+    <path android:fillColor="#E8B54A" android:pathData="M52,20a28,28 0 1,0 20,47a23,23 0 1,1 -20,-47z" />
+    <path android:fillColor="#F6D78E" android:pathData="M66,26l2.4,5.6l5.6,2.4l-5.6,2.4l-2.4,5.6l-2.4,-5.6l-5.6,-2.4l5.6,-2.4z" />
+</vector>

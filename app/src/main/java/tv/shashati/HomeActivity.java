@@ -1,7 +1,6 @@
 package tv.shashati;
 
 import android.app.Activity;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
@@ -10,13 +9,14 @@ import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.BaseAdapter;
-import android.widget.GridView;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import java.util.ArrayList;
@@ -26,9 +26,11 @@ import java.util.Set;
 
 /** The home screen: clock and prayers on top, the TV's apps below, settings at the end. */
 public class HomeActivity extends Activity {
+    private static final int COLUMNS = 6;
+
     private final Handler handler = new Handler(Looper.getMainLooper());
     private InfoPanel panel;
-    private GridView grid;
+    private LinearLayout apps;
 
     private final Runnable tick = new Runnable() {
         @Override public void run() {
@@ -43,20 +45,27 @@ public class HomeActivity extends Activity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        root.setPadding(dp(48), dp(32), dp(48), dp(24));
+        root.setPadding(dp(56), dp(28), dp(56), 0);
 
         panel = new InfoPanel(this, false);
         root.addView(panel);
 
-        grid = new GridView(this);
-        grid.setNumColumns(6);
-        grid.setHorizontalSpacing(dp(18));
-        grid.setVerticalSpacing(dp(18));
-        grid.setPadding(0, dp(28), 0, 0);
-        grid.setClipToPadding(false);
-        grid.setSelector(android.R.color.transparent);
-        grid.setDrawSelectorOnTop(false);
-        root.addView(grid, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+        TextView heading = new TextView(this);
+        heading.setText("التطبيقات");
+        heading.setTextSize(22);
+        heading.setTextColor(InfoPanel.GOLD);
+        heading.setPadding(dp(8), dp(28), dp(8), dp(4));
+        root.addView(heading);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setClipToPadding(false);
+        scroll.setPadding(0, dp(12), 0, dp(32));
+        scroll.setVerticalScrollBarEnabled(false);
+        apps = new LinearLayout(this);
+        apps.setOrientation(LinearLayout.VERTICAL);
+        apps.setClipChildren(false);
+        scroll.addView(apps);
+        root.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
 
         setContentView(root);
     }
@@ -64,16 +73,7 @@ public class HomeActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        grid.setAdapter(new Apps(this, loadApps()));
-        grid.setOnItemClickListener((parent, view, position, id) -> {
-            Tile tile = (Tile) parent.getItemAtPosition(position);
-            try {
-                startActivity(tile.intent);
-            } catch (Exception ignored) {
-                // The app was removed since the list was built.
-            }
-        });
-        grid.requestFocus();
+        showApps(loadApps());
         handler.post(tick);
     }
 
@@ -86,6 +86,85 @@ public class HomeActivity extends Activity {
     @Override
     public void onBackPressed() {
         // The home screen has nowhere to go back to.
+    }
+
+    private void showApps(List<Tile> tiles) {
+        apps.removeAllViews();
+        LinearLayout row = null;
+        for (int i = 0; i < tiles.size(); i++) {
+            if (i % COLUMNS == 0) {
+                row = new LinearLayout(this);
+                row.setClipChildren(false);
+                apps.addView(row);
+            }
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(150), 1);
+            lp.setMargins(dp(10), dp(10), dp(10), dp(10));
+            row.addView(tileView(tiles.get(i)), lp);
+        }
+        // Keep the last row's tiles the same width as the rest.
+        if (row != null) {
+            for (int i = row.getChildCount(); i < COLUMNS; i++) {
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(150), 1);
+                lp.setMargins(dp(10), dp(10), dp(10), dp(10));
+                row.addView(new View(this), lp);
+            }
+        }
+        if (apps.getChildCount() > 0) ((ViewGroup) apps.getChildAt(0)).getChildAt(0).requestFocus();
+    }
+
+    private View tileView(Tile tile) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setGravity(Gravity.CENTER);
+        box.setBackgroundResource(R.drawable.tile);
+        box.setPadding(dp(10), dp(12), dp(10), dp(10));
+        box.setFocusable(true);
+        box.setClickable(true);
+        box.setElevation(dp(2));
+
+        if (tile.banner != null) {
+            ImageView image = new ImageView(this);
+            image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            image.setImageDrawable(tile.banner);
+            image.setClipToOutline(true);
+            image.setBackgroundResource(R.drawable.icon_well);
+            box.addView(image, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+        } else {
+            FrameLayout well = new FrameLayout(this);
+            well.setBackgroundResource(R.drawable.icon_well);
+            ImageView image = new ImageView(this);
+            image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            image.setImageDrawable(tile.icon);
+            if (tile.tint) image.setColorFilter(InfoPanel.GOLD);
+            int pad = dp(10);
+            image.setPadding(pad, pad, pad, pad);
+            well.addView(image, new FrameLayout.LayoutParams(dp(72), dp(72), Gravity.CENTER));
+            box.addView(well, new LinearLayout.LayoutParams(dp(72), dp(72)));
+        }
+
+        TextView label = new TextView(this);
+        label.setText(tile.label);
+        label.setTextColor(Color.WHITE);
+        label.setTextSize(16);
+        label.setSingleLine(true);
+        label.setEllipsize(TextUtils.TruncateAt.END);
+        label.setGravity(Gravity.CENTER);
+        label.setPadding(0, dp(8), 0, 0);
+        box.addView(label);
+
+        box.setOnFocusChangeListener((v, focused) -> {
+            v.animate().scaleX(focused ? 1.08f : 1f).scaleY(focused ? 1.08f : 1f)
+                    .translationZ(focused ? dp(12) : 0).setDuration(150).start();
+            label.setTextColor(focused ? InfoPanel.GOLD : Color.WHITE);
+        });
+        box.setOnClickListener(v -> {
+            try {
+                startActivity(tile.intent);
+            } catch (Exception ignored) {
+                // The app was removed since the list was built.
+            }
+        });
+        return box;
     }
 
     private List<Tile> loadApps() {
@@ -103,11 +182,11 @@ public class HomeActivity extends Activity {
                 if (launch == null) continue;
                 Drawable banner = info.activityInfo.loadBanner(pm);
                 if (banner == null) banner = info.activityInfo.applicationInfo.loadBanner(pm);
-                tiles.add(new Tile(info.loadLabel(pm).toString(), banner, info.loadIcon(pm), launch));
+                tiles.add(new Tile(info.loadLabel(pm).toString(), banner, info.loadIcon(pm), false, launch));
             }
         }
         tiles.sort((a, b) -> a.label.compareToIgnoreCase(b.label));
-        tiles.add(new Tile("إعدادات شاشتي", null, getDrawable(R.drawable.icon),
+        tiles.add(new Tile("إعدادات شاشتي", null, getDrawable(R.drawable.ic_settings), true,
                 new Intent(this, SettingsActivity.class)));
         return tiles;
     }
@@ -119,54 +198,15 @@ public class HomeActivity extends Activity {
     private static final class Tile {
         final String label;
         final Drawable banner, icon;
+        final boolean tint;
         final Intent intent;
 
-        Tile(String label, Drawable banner, Drawable icon, Intent intent) {
+        Tile(String label, Drawable banner, Drawable icon, boolean tint, Intent intent) {
             this.label = label;
             this.banner = banner;
             this.icon = icon;
+            this.tint = tint;
             this.intent = intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        }
-    }
-
-    private static final class Apps extends BaseAdapter {
-        private final Context context;
-        private final List<Tile> tiles;
-
-        Apps(Context context, List<Tile> tiles) {
-            this.context = context;
-            this.tiles = tiles;
-        }
-
-        @Override public int getCount() { return tiles.size(); }
-        @Override public Object getItem(int i) { return tiles.get(i); }
-        @Override public long getItemId(int i) { return i; }
-
-        @Override
-        public View getView(int i, View convert, ViewGroup parent) {
-            Tile tile = tiles.get(i);
-            float density = context.getResources().getDisplayMetrics().density;
-            LinearLayout box = new LinearLayout(context);
-            box.setOrientation(LinearLayout.VERTICAL);
-            box.setGravity(Gravity.CENTER);
-            box.setBackgroundResource(R.drawable.tile);
-            box.setPadding((int) (8 * density), (int) (8 * density), (int) (8 * density), (int) (8 * density));
-            box.setMinimumHeight((int) (120 * density));
-
-            ImageView image = new ImageView(context);
-            image.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            image.setImageDrawable(tile.banner != null ? tile.banner : tile.icon);
-            int h = (int) ((tile.banner != null ? 80 : 56) * density);
-            box.addView(image, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, h));
-
-            TextView label = new TextView(context);
-            label.setText(tile.label);
-            label.setTextColor(Color.WHITE);
-            label.setTextSize(16);
-            label.setSingleLine(true);
-            label.setGravity(Gravity.CENTER);
-            box.addView(label);
-            return box;
         }
     }
 }

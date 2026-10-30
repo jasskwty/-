@@ -5,6 +5,7 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.view.Gravity;
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -16,6 +17,13 @@ final class InfoPanel extends LinearLayout {
     static final int GOLD = Color.parseColor("#E8B54A");
 
     private final TextView time, period, date, hijri, next;
+    static final int[] ICONS = {R.drawable.ic_fajr, R.drawable.ic_sunrise, R.drawable.ic_dhuhr,
+            R.drawable.ic_asr, R.drawable.ic_maghrib, R.drawable.ic_isha};
+    private static final int MUTED = Color.parseColor("#B8C4D6");
+
+    private final LinearLayout[] cards = new LinearLayout[6];
+    private final ImageView[] icons = new ImageView[6];
+    private final TextView[] names = new TextView[6];
     private final TextView[] prayers = new TextView[6];
     private final boolean large;
 
@@ -45,10 +53,31 @@ final class InfoPanel extends LinearLayout {
 
         LinearLayout row = new LinearLayout(context);
         row.setGravity(Gravity.CENTER);
+        int width = dp(large ? 150 : 124);
         for (int i = 0; i < 6; i++) {
-            prayers[i] = text(context, large ? 24 : 20, Color.parseColor("#B8C4D6"), false);
-            prayers[i].setPadding(dp(18), dp(10), dp(18), dp(10));
-            row.addView(prayers[i]);
+            LinearLayout card = new LinearLayout(context);
+            card.setOrientation(VERTICAL);
+            card.setGravity(Gravity.CENTER);
+            card.setBackgroundResource(R.drawable.card);
+            card.setPadding(0, dp(large ? 18 : 14), 0, dp(large ? 18 : 14));
+
+            icons[i] = new ImageView(context);
+            icons[i].setImageResource(ICONS[i]);
+            int size = dp(large ? 40 : 32);
+            card.addView(icons[i], new LayoutParams(size, size));
+
+            names[i] = text(context, large ? 22 : 18, MUTED, false);
+            names[i].setText(PrayerTimes.NAMES[i]);
+            names[i].setPadding(0, dp(6), 0, 0);
+            card.addView(names[i]);
+
+            prayers[i] = text(context, large ? 28 : 22, Color.WHITE, true);
+            card.addView(prayers[i]);
+
+            LayoutParams lp = new LayoutParams(width, LayoutParams.WRAP_CONTENT);
+            lp.setMargins(dp(8), 0, dp(8), 0);
+            row.addView(card, lp);
+            cards[i] = card;
         }
         addView(row);
     }
@@ -78,10 +107,13 @@ final class InfoPanel extends LinearLayout {
         next.setText("صلاة " + name + " " + Clock.countdown(at - now));
 
         for (int i = 0; i < 6; i++) {
-            prayers[i].setText(PrayerTimes.NAMES[i] + "\n" + Clock.time(today.times[i], zone));
+            prayers[i].setText(Clock.time(today.times[i], zone));
             boolean isNext = i == n;
-            prayers[i].setTextColor(isNext ? GOLD : Color.parseColor("#B8C4D6"));
-            prayers[i].setTypeface(null, isNext ? Typeface.BOLD : Typeface.NORMAL);
+            cards[i].setBackgroundResource(isNext ? R.drawable.card_next : R.drawable.card);
+            icons[i].setColorFilter(isNext ? GOLD : Color.WHITE);
+            names[i].setTextColor(isNext ? GOLD : MUTED);
+            prayers[i].setTextColor(isNext ? GOLD : Color.WHITE);
+            cards[i].setAlpha(i == 1 ? 0.7f : 1f);
         }
     }
 
