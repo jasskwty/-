@@ -1,0 +1,9 @@
+# Apps the speed-up turns off. Each one comes back with reset.sh.
+# Only things that run in the background and that شاشتي replaces or that nobody needs on a TV.
+com.google.android.tvrecommendations
+com.google.android.leanbacklauncher.recommendations
+com.google.android.feedback
+com.google.android.partnersetup
+com.google.android.apps.tv.dreamx
+com.google.android.backdrop
+com.android.printspooler
