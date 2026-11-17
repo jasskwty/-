@@ -61,8 +61,9 @@ export async function downloadPptx(
     const slide = pptx.addSlide();
     slide.background = { color: t.bg };
     slide.addShape(pptx.ShapeType.rect, { x: W - 0.25, y: 0, w: 0.25, h: H, fill: { color: t.titleBg } });
+    const badge = s.priority === "high" || s.priority === "medium";
     slide.addText(s.title, {
-      ...rtl, x: 0.7, y: 0.45, w: W - 1.6, h: 1.0, fontSize: 32, bold: true, color: t.heading, align: "right", valign: "middle", fit: "shrink",
+      ...rtl, x: badge ? 3.0 : 0.7, y: 0.45, w: W - (badge ? 3.9 : 1.6), h: 1.0, fontSize: 32, bold: true, color: t.heading, align: "right", valign: "middle", fit: "shrink",
     });
     slide.addShape(pptx.ShapeType.rect, { x: W - 3.4, y: 1.5, w: 2.5, h: 0.07, fill: { color: t.accent } });
     slide.addText(
@@ -72,6 +73,13 @@ export async function downloadPptx(
       })),
       { ...rtl, x: 0.7, y: 1.85, w: W - 1.6, h: H - 2.7, fontSize: 22, color: t.text, align: "right", valign: "top", fit: "shrink", lineSpacingMultiple: 1.15 },
     );
+    if (s.priority === "high" || s.priority === "medium") {
+      const high = s.priority === "high";
+      slide.addText(high ? "⭐ مهم للاختبار" : "◆ يجي أحياناً", {
+        ...rtl, x: 0.4, y: 0.3, w: 2.4, h: 0.45, fontSize: 13, bold: true, align: "center", valign: "middle",
+        color: high ? "B91C1C" : "92400E", fill: { color: high ? "FEE2E2" : "FEF3C7" }, rectRadius: 0.2, shape: pptx.ShapeType.roundRect,
+      });
+    }
     slide.addText(`${i + 2}`, { ...rtl, x: 0.4, y: H - 0.7, w: 0.8, h: 0.4, fontSize: 12, color: t.accent, align: "left" });
     if (s.notes) slide.addNotes(s.notes);
   });

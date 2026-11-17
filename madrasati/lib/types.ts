@@ -20,10 +20,31 @@ export interface FlashcardDeck {
   cards: Flashcard[];
 }
 
+export type Priority = "high" | "medium" | "low";
+
 export interface Slide {
   title: string;
   bullets: string[];
   notes: string;
+  /** أولوية الشريحة في الاختبار (فاضي إذا العرض بدون تحليل اختبارات) */
+  priority?: Priority | "";
+}
+
+/** بند من حصر الدرس في الاختبارات */
+export interface ExamFocusItem {
+  topic: string;
+  priority: Priority;
+  count: number; // كم مرة ظهر في الملفات
+  question_types: string[];
+  sources: string;
+  tip: string;
+}
+export interface ExamFocus {
+  lesson: string;
+  coverage: string;
+  items: ExamFocusItem[];
+  sample_questions: string[];
+  warnings: string;
 }
 export interface Presentation {
   title: string;

@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { gradeLabel, subjectLabel, type StudyContext } from "@/lib/constants";
-import type { Presentation } from "@/lib/types";
+import type { ExamFocus, ExamFocusItem, Presentation } from "@/lib/types";
+import { ExamFocusPanel, PriorityBadge, SECONDARY_GRADES } from "../ExamFocusPanel";
 import { postJson } from "@/lib/client/stream";
 import { useHistory, useStored, type HistoryItem } from "@/lib/client/storage";
 import { downloadPptx, THEMES, themeById, type SlideTheme } from "@/lib/client/pptx";
@@ -15,7 +16,10 @@ interface DeckState {
   studentName: string;
   presentation: Presentation;
   extras: string[];
+  /** حصر الدرس في الاختبارات (ثانوي) كما اعتمده المستخدم */
+  focus?: FocusValue | null;
 }
+type FocusValue = { focus: ExamFocus; items: ExamFocusItem[] };
 
 const hex = (c: string) => `#${c}`;
 
@@ -54,9 +58,13 @@ function TitleSlide({ p, theme, name, meta, byline }: { p: Presentation; theme: 
 function ContentSlide({ s, n, theme }: { s: Presentation["slides"][number]; n: number; theme: SlideTheme }) {
   return (
     <SlideFrame theme={theme}>
+      <PriorityBadge priority={s.priority} />
       <div className="absolute inset-y-0 right-0 w-[1.9%]" style={{ background: hex(theme.titleBg) }} />
       <div className="absolute inset-y-[6%] right-[6%] left-[5%]">
-        <div className="font-bold leading-tight" style={{ fontSize: "3.6cqw", color: hex(theme.heading) }}>
+        <div
+          className={cx("font-bold leading-tight", (s.priority === "high" || s.priority === "medium") && "pl-[17%]")}
+          style={{ fontSize: "3.6cqw", color: hex(theme.heading) }}
+        >
           {s.title}
         </div>
         <div className="mt-[1.5%] h-[1%] w-[19%]" style={{ background: hex(theme.accent) }} />
@@ -81,6 +89,8 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
   const byline = teacher ? "إعداد المعلم/ة" : "إعداد الطالب";
   const history = useHistory<DeckState>(teacher ? "teacher:presentation" : "presentation");
   const [topic, setTopic] = useState("");
+  const [focus, setFocus] = useState<FocusValue | null>(null);
+  const secondary = SECONDARY_GRADES.includes(ctx.grade);
   const [count, setCount] = useState(6);
   const [themeId, setThemeId] = useStored("presentation:theme", THEMES[0].id);
   const [studentName, setStudentName] = useStored(teacher ? "teacher:presentation:name" : "presentation:name", "");
@@ -102,9 +112,14 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
     setLoading(true);
     setError("");
     try {
-      const presentation = await postJson<Presentation>("/api/json", { ...ctx, tool: "presentation", topic, count }, ac.signal);
+      const useFocus = secondary && focus?.items.length ? focus : null;
+      const presentation = await postJson<Presentation>(
+        "/api/json",
+        { ...ctx, tool: "presentation", topic, count, focus: useFocus?.items },
+        ac.signal,
+      );
       if (!presentation.slides?.length) throw new Error("ما طلعت شرائح. جرّب موضوع ثاني.");
-      const data: DeckState = { topic, themeId, studentName, presentation, extras: [] };
+      const data: DeckState = { topic, themeId, studentName, presentation, extras: [], focus: useFocus };
       const id = history.add({ label: presentation.title || topic, grade: ctx.grade, subject: ctx.subject, data });
       setState({ id, data });
       setCurrent(0);
@@ -190,8 +205,9 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
               ))}
             </div>
           </div>
+          {secondary && <ExamFocusPanel ctx={ctx} topic={topic} value={focus} onChange={setFocus} />}
           <Button type="submit" disabled={!topic.trim() || loading} className="w-full sm:w-auto">
-            🎞️ جهّز العرض
+            🎞️ {secondary && focus?.items.length ? "جهّز العرض حسب أولويات الاختبار" : "جهّز العرض"}
           </Button>
         </form>
       </Card>
@@ -275,6 +291,8 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
           if (it.data.studentName) setStudentName(it.data.studentName);
           setCurrent(0);
           setError("");
+          setTopic(it.data.topic);
+          setFocus(it.data.focus ?? null);
         }}
         onRemove={history.remove}
         onClear={history.clear}
