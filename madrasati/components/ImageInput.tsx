@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { fileToImage, type PickedImage } from "@/lib/client/image";
+import { fileToAttachment, type PickedImage } from "@/lib/client/image";
 import { Button } from "./ui";
 
 export function ImageInput({
@@ -8,11 +8,15 @@ export function ImageInput({
   onChange,
   max = 4,
   compact = false,
+  allowPdf = false,
+  label,
 }: {
   images: PickedImage[];
   onChange: (imgs: PickedImage[]) => void;
   max?: number;
   compact?: boolean;
+  allowPdf?: boolean;
+  label?: string;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const camRef = useRef<HTMLInputElement>(null);
@@ -26,7 +30,7 @@ export function ImageInput({
     try {
       const list = Array.from(files).slice(0, Math.max(0, max - images.length));
       if (!list.length) throw new Error(`تقدر ترفع ${max} صور كحد أقصى.`);
-      const picked = await Promise.all(list.map(fileToImage));
+      const picked = await Promise.all(list.map((f) => fileToAttachment(f, allowPdf)));
       onChange([...images, ...picked]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "ما قدرنا نضيف الصورة.");
@@ -40,7 +44,7 @@ export function ImageInput({
   return (
     <div
       onPaste={(e) => {
-        const files = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/"));
+        const files = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/") || (allowPdf && f.type === "application/pdf"));
         if (files.length) {
           e.preventDefault();
           e.stopPropagation();
@@ -51,7 +55,7 @@ export function ImageInput({
       <input
         ref={fileRef}
         type="file"
-        accept="image/*"
+        accept={allowPdf ? "image/*,application/pdf" : "image/*"}
         multiple
         className="hidden"
         onChange={(e) => void addFiles(e.target.files)}
@@ -71,9 +75,9 @@ export function ImageInput({
           size="sm"
           onClick={() => fileRef.current?.click()}
           disabled={busy || images.length >= max}
-          aria-label="ارفع صورة"
+          aria-label={label ?? (allowPdf ? "ارفع صورة أو PDF" : "ارفع صورة")}
         >
-          🖼️ {compact ? "" : "ارفع صورة"}
+          {allowPdf ? "📎" : "🖼️"} {compact ? "" : (label ?? (allowPdf ? "ارفع صورة أو PDF" : "ارفع صورة"))}
         </Button>
         {!compact && (
           <Button
@@ -92,17 +96,30 @@ export function ImageInput({
         <div className="mt-2 flex flex-wrap gap-2">
           {images.map((img) => (
             <div key={img.id} className="group relative">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={img.preview}
-                alt="صورة مرفقة"
-                className="size-20 rounded-xl border border-slate-200 object-cover dark:border-slate-700"
-              />
+              {img.preview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={img.preview}
+                  alt="صورة مرفقة"
+                  className="size-20 rounded-xl border border-slate-200 object-cover dark:border-slate-700"
+                />
+              ) : (
+                <div
+                  className="flex size-20 flex-col items-center justify-center gap-1 rounded-xl border border-slate-200 bg-red-50 p-1 text-center dark:border-slate-700 dark:bg-red-950/30"
+                  title={img.name}
+                  data-testid="pdf-chip"
+                >
+                  <span className="text-2xl" aria-hidden>
+                    📄
+                  </span>
+                  <span className="w-full truncate text-[10px] text-slate-600 dark:text-slate-300">{img.name ?? "PDF"}</span>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => onChange(images.filter((i) => i.id !== img.id))}
                 className="absolute -top-2 -left-2 flex size-6 items-center justify-center rounded-full bg-slate-800 text-xs text-white shadow"
-                aria-label="احذف الصورة"
+                aria-label="احذف المرفق"
               >
                 ✕
               </button>

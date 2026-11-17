@@ -1,11 +1,35 @@
-import type { ImageData } from "@/lib/constants";
+import { PDF_TYPE, type ImageData } from "@/lib/constants";
 
 const MAX_SIDE = 1568; // أنسب حجم لقراءة الصور
 const MAX_FILE = 15 * 1024 * 1024;
 
+const MAX_PDF = 10 * 1024 * 1024;
+
 export interface PickedImage extends ImageData {
   id: string;
-  preview: string; // data URL
+  preview: string; // data URL للصور، وفاضي لملفات PDF
+  name?: string;
+}
+
+/** يقرأ ملف PDF كـ base64 */
+async function pdfToAttachment(file: File): Promise<PickedImage> {
+  if (file.size > MAX_PDF) throw new Error("ملف PDF أكبر من ١٠ ميغابايت. قسّمه أو صوّر الصفحات المطلوبة فقط.");
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(new Error("ما قدرنا نقرأ ملف PDF."));
+    r.readAsDataURL(file);
+  });
+  return { id: Math.random().toString(36).slice(2), media_type: PDF_TYPE, data: dataUrl.split(",")[1], preview: "", name: file.name };
+}
+
+/** صورة أو PDF */
+export async function fileToAttachment(file: File, allowPdf: boolean): Promise<PickedImage> {
+  if (file.type === PDF_TYPE) {
+    if (!allowPdf) throw new Error("هنا تقدر ترفع صور بس.");
+    return pdfToAttachment(file);
+  }
+  return fileToImage(file);
 }
 
 /** يصغّر الصورة ويحولها JPEG قبل الإرسال */

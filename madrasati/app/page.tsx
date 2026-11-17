@@ -14,8 +14,12 @@ import {
   GradeTool,
   LessonPlanTool,
   RubricTool,
+  ScaffoldTool,
+  SimplifyTool,
   WorksheetTool,
 } from "@/components/tools/TeacherTools";
+import { TrackerTool } from "@/components/tools/TrackerTool";
+import { PrivacyPanel, ReferencePanel } from "@/components/TeacherPanels";
 
 const STUDENT_TABS = [
   { id: "chat", label: "اسأل المعلم", icon: "💬", Comp: ChatTool },
@@ -32,16 +36,29 @@ const STUDENT_TABS = [
 // أدوات المعلم (معرّفاتها مختلفة عشان كل أداة تحتفظ بحالتها الخاصة)
 const TEACHER_TABS = [
   { id: "t-chat", label: "مساعد تربوي", icon: "💬", Comp: ChatTool },
+  // ١. التحضير وتصميم المحتوى
   { id: "t-lesson", label: "تحضير درس", icon: "📋", Comp: LessonPlanTool },
-  { id: "t-worksheet", label: "ورقة عمل / اختبار", icon: "📄", Comp: WorksheetTool },
+  { id: "t-diff", label: "أنشطة وتجارب", icon: "🧩", Comp: DifferentiateTool },
+  { id: "t-simplify", label: "تبسيط المحتوى", icon: "🪜", Comp: SimplifyTool },
+  { id: "t-presentation", label: "برزنتيشن", icon: "🎞️", Comp: PresentationTool },
+  // ٢. التقييم والتصحيح
+  { id: "t-worksheet", label: "أسئلة واختبارات", icon: "📄", Comp: WorksheetTool },
   { id: "t-grade", label: "تصحيح إجابات", icon: "✅", Comp: GradeTool },
   { id: "t-rubric", label: "سلّم تقدير", icon: "📏", Comp: RubricTool },
-  { id: "t-diff", label: "أنشطة متمايزة", icon: "🧩", Comp: DifferentiateTool },
-  { id: "t-comments", label: "رسائل وملاحظات", icon: "✉️", Comp: CommentsTool },
-  { id: "t-presentation", label: "برزنتيشن", icon: "🎞️", Comp: PresentationTool },
+  // ٣. التخصيص ودعم الطلاب
+  { id: "t-tracker", label: "سجل الطلاب", icon: "📊", Comp: TrackerTool },
+  { id: "t-scaffold", label: "دعم الاحتياجات", icon: "🤝", Comp: ScaffoldTool },
+  // ٤. الأعمال الإدارية
+  { id: "t-comments", label: "رسائل وتقارير", icon: "✉️", Comp: CommentsTool },
 ] as const;
 
 const ALL_TABS = [...STUDENT_TABS, ...TEACHER_TABS];
+
+// مفاتيح سجلات أدوات المعلم (لزر حذف بيانات المعلم)
+const TEACHER_TOOL_KEYS = [
+  "lessonPlan", "worksheet", "grade", "rubric", "differentiate", "comments",
+  "simplify", "scaffold", "tracker", "teacher:presentation",
+];
 type TabId = (typeof ALL_TABS)[number]["id"];
 
 type Theme = "light" | "dark" | "system";
@@ -91,6 +108,7 @@ export default function Home() {
     setVisited((v) => (v.has(tab) ? v : new Set(v).add(tab)));
   }, [tab]);
 
+  const [reference, setReference] = useStored<string>(`teacher:reference:${grade}:${subject}`, "");
   const ctx = { grade, subject, role };
 
   return (
@@ -173,7 +191,7 @@ export default function Home() {
             </label>
           </div>
 
-          <nav className="no-scrollbar -mx-4 mt-2 flex gap-1 overflow-x-auto px-4 pb-2" role="tablist" aria-label="الأدوات">
+          <nav className="no-scrollbar -mx-4 mt-2 flex gap-1 overflow-x-auto px-4 pb-2 lg:flex-wrap lg:overflow-visible" role="tablist" aria-label="الأدوات">
             {TABS.map((t) => (
               <button
                 key={t.id}
@@ -197,10 +215,18 @@ export default function Home() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-5 sm:py-8">
+        {teacher && (
+          <div className="mb-5 grid gap-2 md:grid-cols-2 md:items-start">
+            <ReferencePanel ctx={{ ...ctx, role: "teacher" }} value={reference} onChange={setReference} />
+            <PrivacyPanel teacherTools={TEACHER_TOOL_KEYS} />
+          </div>
+        )}
         {ALL_TABS.map(({ id, label, Comp }) =>
           visited.has(id) || id === tab ? (
             <section key={id} role="tabpanel" hidden={id !== tab} aria-label={label}>
-              <Comp ctx={{ ...ctx, role: id.startsWith("t-") ? "teacher" : "student" }} />
+              <Comp
+                ctx={id.startsWith("t-") ? { ...ctx, role: "teacher", reference } : { ...ctx, role: "student" }}
+              />
             </section>
           ) : null,
         )}

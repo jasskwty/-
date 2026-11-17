@@ -7,7 +7,33 @@ export const maxDuration = 300;
 const TEXT_TOOLS = [
   "explain", "solve", "summarize", "essay", "schedule", "more",
   "lessonPlan", "worksheet", "grade", "rubric", "differentiate", "comments",
+  "simplify", "scaffold", "tracker", "extractReference",
 ] as const;
+type TaskKey = keyof typeof TASKS;
+
+const ACTIVITY_KINDS: Record<string, TaskKey> = {
+  differentiated: "differentiate",
+  interactive: "interactive",
+  experiment: "experiment",
+  aids: "aids",
+};
+const LEVELS: Record<string, string> = {
+  support: "مبسط جداً (للطلاب اللي يحتاجون دعم في القراءة)",
+  grade: "مستوى الصف",
+  advanced: "متقدم (إثرائي للمتفوقين)",
+  l2: "مبسط لغوياً لغير الناطقين بالعربية",
+};
+const NEEDS: Record<string, string> = {
+  dyslexia: "صعوبات القراءة (عسر القراءة)",
+  adhd: "تشتت الانتباه وفرط الحركة",
+  autism: "طيف التوحد",
+  dyscalculia: "صعوبات الحساب",
+  writing: "صعوبات الكتابة",
+  slow: "بطء التعلم",
+  gifted: "الموهوبين والمتفوقين",
+  sensory: "ضعف السمع أو البصر",
+  anxiety: "قلق الاختبارات أو ضعف الثقة",
+};
 
 const QUESTION_TYPES: Record<string, string> = {
   mcq: "اختيار من متعدد",
@@ -17,24 +43,30 @@ const QUESTION_TYPES: Record<string, string> = {
   essay: "مقالي",
   problem: "مسائل",
   match: "توصيل",
+  hots: "تفكير ناقد وحل مشكلات (مستويات عليا)",
 };
 const SHEET_KINDS: Record<string, string> = {
   worksheet: "ورقة عمل صفية",
   quiz: "اختبار قصير",
   exam: "اختبار شامل",
   homework: "واجب منزلي",
+  bank: "بنك أسئلة",
 };
 const COMMENT_KINDS: Record<string, string> = {
   parent: "رسالة لولي الأمر",
   report: "ملاحظة للشهادة أو التقرير الدراسي",
   praise: "عبارات تعزيز وتشجيع للطالب",
   warning: "تنبيه لولي الأمر بخصوص مستوى أو سلوك",
+  periodic: "تقرير دوري عن مستوى الطالب",
 };
 
 const opt = (v: unknown, label: string, max = 4000) => readText(v, label, { required: false, max });
 type TextTool = (typeof TEXT_TOOLS)[number];
 
-function buildRequest(tool: TextTool, body: Record<string, unknown>): { text: string; withImages: boolean } {
+function buildRequest(
+  tool: TextTool,
+  body: Record<string, unknown>,
+): { text: string; withImages: boolean; task?: TaskKey } {
   switch (tool) {
     case "explain": {
       const topic = readText(body.input, "اسم الدرس أو الموضوع", { max: 2000 });
@@ -81,7 +113,7 @@ function buildRequest(tool: TextTool, body: Record<string, unknown>): { text: st
       const notes = opt(body.notes, "الملاحظات", 2000);
       return {
         text: `حضّر لي درس: ${topic}\nزمن الحصة: ${minutes} دقيقة${notes ? `\nملاحظات وإمكانيات الصف: ${notes}` : ""}`,
-        withImages: false,
+        withImages: true,
       };
     }
     case "worksheet": {
@@ -93,9 +125,10 @@ function buildRequest(tool: TextTool, body: Record<string, unknown>): { text: st
       const level = readText(body.level, "المستوى", { required: false, max: 20 }) || "متنوع";
       const total = readInt(body.total, 0, 100, 0);
       const key = body.answerKey === true;
+      const objectives = opt(body.objectives, "الأهداف", 3000);
       return {
-        text: `النوع: ${kind}\nالموضوع: ${topic}\nأنواع الأسئلة: ${types.join("، ")}\nإجمالي عدد الأسئلة/البنود: ${count} تقريباً، موزعة على الأنواع\nمستوى الصعوبة: ${level}${total ? `\nالدرجة الكلية: ${total}` : ""}\nمفتاح الإجابة: ${key ? "نعم، أضفه في النهاية" : "لا تضفه"}`,
-        withImages: false,
+        text: `النوع: ${kind}\nالموضوع: ${topic}\nأنواع الأسئلة: ${types.join("، ")}\nإجمالي عدد الأسئلة/البنود: ${count} تقريباً، موزعة على الأنواع\nمستوى الصعوبة: ${level}${total ? `\nالدرجة الكلية: ${total}` : ""}${objectives ? `\nالأهداف أو المعايير المرتبطة: ${objectives}` : ""}\nمفتاح الإجابة: ${key || kind === SHEET_KINDS.bank ? "نعم" : "لا تضفه"}`,
+        withImages: true,
       };
     }
     case "grade": {
@@ -121,16 +154,51 @@ function buildRequest(tool: TextTool, body: Record<string, unknown>): { text: st
       const topic = readText(body.input, "الهدف أو الموضوع", { max: 2000 });
       const minutes = readInt(body.minutes, 5, 90, 20);
       const mode = body.mode === "individual" ? "فردي" : "مجموعات";
-      return { text: `الموضوع/الهدف: ${topic}\nزمن النشاط: ${minutes} دقيقة\nطريقة العمل: ${mode}`, withImages: false };
+      return {
+        text: `الموضوع/الهدف: ${topic}\nزمن النشاط: ${minutes} دقيقة\nطريقة العمل: ${mode}`,
+        withImages: false,
+        task: ACTIVITY_KINDS[String(body.kind)] ?? "differentiate",
+      };
     }
     case "comments": {
       const kind = COMMENT_KINDS[String(body.kind)] ?? COMMENT_KINDS.parent;
-      const name = opt(body.studentName, "اسم الطالب", 60);
+      // اسم الطالب ما يُرسل أبداً؛ الواجهة تعوّض [اسم الطالب] بعد وصول الرد
       const notes = readText(body.input, "ملاحظاتك عن الطالب", { max: 3000 });
+      return { text: `النوع: ${kind}\nملاحظات المعلم عن [اسم الطالب]: ${notes}`, withImages: false };
+    }
+    case "simplify": {
+      const input = opt(body.input, "النص", 15000);
+      const levels = (Array.isArray(body.levels) ? body.levels : []).map((l) => LEVELS[String(l)]).filter(Boolean);
+      if (!levels.length) throw new UserFacingError("اختر مستوى واحد على الأقل.");
+      const extras = [body.vocab === true && "المفردات الأساسية", body.questions === true && "أسئلة فهم"].filter(Boolean);
       return {
-        text: `النوع: ${kind}${name ? `\nاسم الطالب: ${name}` : "\n(بدون اسم: استخدم [اسم الطالب] كمكان للاسم)"}\nملاحظات المعلم: ${notes}`,
+        text: `المستويات المطلوبة: ${levels.join("، ")}\nإضافات مطلوبة: ${extras.length ? extras.join("، ") : "لا شيء"}\n\n${input ? `المحتوى:\n${input}` : "المحتوى في المرفقات."}`,
+        withImages: true,
+      };
+    }
+    case "scaffold": {
+      const need = NEEDS[String(body.need)];
+      if (!need) throw new UserFacingError("اختر نوع الاحتياج.");
+      const topic = readText(body.input, "الدرس أو المهمة", { max: 2000 });
+      const notes = opt(body.notes, "الملاحظات", 2000);
+      return {
+        text: `نوع الاحتياج: ${need}\nالدرس أو المهمة: ${topic}${notes ? `\nملاحظات المعلم (بدون أسماء): ${notes}` : ""}`,
         withImages: false,
       };
+    }
+    case "tracker": {
+      const data = readText(body.data, "بيانات الفصل", { max: 30000 });
+      const focus = opt(body.focus, "التركيز", 1000);
+      const reports = body.mode === "reports";
+      return {
+        text: `${reports ? "اكتب تقارير دورية للطلاب التالية بياناتهم." : "حلّل أداء الفصل التالي."}${focus ? `\nركّز على: ${focus}` : ""}\n\n${data}`,
+        withImages: false,
+        task: reports ? "reports" : "tracker",
+      };
+    }
+    case "extractReference": {
+      const input = opt(body.input, "النص", 20000);
+      return { text: input ? `المصدر:\n${input}` : "المصدر في المرفقات.", withImages: true };
     }
     case "more": {
       const previous = readText(body.previous, "الرد السابق", { max: 40000 });
@@ -150,12 +218,13 @@ export async function POST(req: Request) {
     const tool = TEXT_TOOLS.find((t) => t === body.tool);
     if (!tool) throw new UserFacingError("الأداة غير معروفة.");
 
-    const { text, withImages } = buildRequest(tool, body);
+    const { text, withImages, task: taskKey } = buildRequest(tool, body);
     const images = withImages ? readImages(body.images) : [];
     if (withImages && !images.length && !readText(body.input, "النص", { required: false }))
       throw new UserFacingError(tool === "grade" ? "اكتب إجابة الطالب أو ارفع صورة ورقته." : "اكتب النص أو ارفع صورة أول.");
 
-    const task = tool === "more" && ctx.role === "teacher" ? TASKS.teacherMore : TASKS[tool];
+    const task =
+      tool === "more" && ctx.role === "teacher" ? TASKS.teacherMore : TASKS[taskKey ?? (tool as TaskKey)];
     return await streamTextResponse({
       system: systemPrompt(ctx, task),
       messages: [{ role: "user", content: userContent(text, images) }],

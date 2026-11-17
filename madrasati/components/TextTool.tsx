@@ -6,11 +6,16 @@ import { useHistory, type HistoryItem } from "@/lib/client/storage";
 import { HistoryPanel } from "./HistoryPanel";
 import { ResultView } from "./ResultView";
 import { Button, ErrorBox, Spinner } from "./ui";
+import type { Aliases } from "@/lib/client/privacy";
 
 export interface TextResult {
   request: string;
   content: string;
   extras: string[];
+  /** رموز الطلاب ← أسمائهم (تنحفظ في الجهاز فقط) */
+  aliases?: Aliases;
+  approved?: boolean;
+  edited?: boolean;
 }
 
 export interface RunArgs {
@@ -20,6 +25,7 @@ export interface RunArgs {
   label: string;
   /** وصف الطلب، يرسل مع «اشرح أكثر» */
   request: string;
+  aliases?: Aliases;
 }
 
 /**
@@ -54,7 +60,7 @@ export function TextTool({
     lastArgs.current = args;
     setError("");
     setStreaming(true);
-    const data: TextResult = { request: args.request, content: "", extras: [] };
+    const data: TextResult = { request: args.request, content: "", extras: [], aliases: args.aliases };
     setCurrent({ id: null, data });
     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
     try {
@@ -107,13 +113,21 @@ export function TextTool({
         {error && <ErrorBox message={error} onRetry={lastArgs.current ? () => run(lastArgs.current!) : undefined} />}
         {current ? (
           <ResultView
+            key={current.id ?? "live"}
             ctx={ctx}
             content={current.data.content}
             streaming={streaming}
             request={current.data.request}
             extras={current.data.extras}
+            aliases={current.data.aliases}
+            review={{ approved: current.data.approved, edited: current.data.edited }}
             onExtrasChange={(extras) => {
               const data = { ...current.data, extras };
+              setCurrent({ ...current, data });
+              if (current.id) history.update(current.id, data);
+            }}
+            onReviewChange={(patch) => {
+              const data = { ...current.data, ...patch };
               setCurrent({ ...current, data });
               if (current.id) history.update(current.id, data);
             }}

@@ -32,8 +32,11 @@ export type SubjectId = (typeof SUBJECTS)[number]["id"];
 export const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
 export type ImageMediaType = (typeof ALLOWED_IMAGE_TYPES)[number];
 
+export const PDF_TYPE = "application/pdf";
+
+/** مرفق: صورة أو ملف PDF */
 export interface ImageData {
-  media_type: ImageMediaType;
+  media_type: ImageMediaType | typeof PDF_TYPE;
   data: string; // base64 بدون البادئة
 }
 
@@ -43,6 +46,8 @@ export interface StudyContext {
   grade: GradeId;
   subject: SubjectId;
   role: Role;
+  /** مرجع المنهج اللي يحفظه المعلم لهذا الصف والمادة (وضع المعلم فقط) */
+  reference?: string;
 }
 
 // علامات التحكم داخل البث النصي (تفصلها الواجهة عن النص)

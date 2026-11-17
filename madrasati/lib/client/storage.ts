@@ -12,9 +12,13 @@ export function load<T>(key: string, fallback: T): T {
   }
 }
 
+const SYNC_EVENT = "madrasati:storage";
+
 export function save(key: string, value: unknown) {
   try {
     localStorage.setItem(PREFIX + key, JSON.stringify(value));
+    // نبلّغ باقي الأدوات المفتوحة اللي تستخدم نفس المفتاح
+    window.dispatchEvent(new CustomEvent(SYNC_EVENT, { detail: key }));
   } catch {
     // المساحة ممتلئة أو التخزين مقفل: نحاول نخفف البيانات القديمة
     try {
@@ -23,18 +27,49 @@ export function save(key: string, value: unknown) {
   }
 }
 
-/** حالة تنحفظ تلقائياً في localStorage */
+/**
+ * حالة تنحفظ تلقائياً في localStorage.
+ * القيمة مربوطة بمفتاحها، فلما يتغير المفتاح (مثلاً الصف أو المادة)
+ * ما تنكتب القيمة القديمة على المفتاح الجديد.
+ */
 export function useStored<T>(key: string, initial: T) {
-  const [value, setValue] = useState<T>(initial);
-  const [ready, setReady] = useState(false);
+  const [st, setSt] = useState<{ k: string | null; v: T }>({ k: null, v: initial });
+  const ready = st.k === key;
+
   useEffect(() => {
-    setValue(load(key, initial));
-    setReady(true);
+    setSt({ k: key, v: load(key, initial) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
+
   useEffect(() => {
-    if (ready) save(key, value);
-  }, [key, value, ready]);
+    if (st.k === key) save(key, st.v);
+  }, [st, key]);
+
+  useEffect(() => {
+    const onSync = (e: Event) => {
+      if ((e as CustomEvent).detail !== key) return;
+      const fresh = load(key, initial);
+      setSt((cur) => (cur.k === key && JSON.stringify(cur.v) === JSON.stringify(fresh) ? cur : { k: key, v: fresh }));
+    };
+    window.addEventListener(SYNC_EVENT, onSync);
+    return () => window.removeEventListener(SYNC_EVENT, onSync);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  // أثناء تبديل المفتاح نقرأ القيمة الجديدة مباشرة
+  const value = ready ? st.v : st.k === null ? initial : load(key, initial);
+
+  const setValue = useCallback(
+    (next: T | ((prev: T) => T)) =>
+      setSt((cur) => {
+        const prev = cur.k === key ? cur.v : load(key, initial);
+        const v = typeof next === "function" ? (next as (p: T) => T)(prev) : next;
+        return { k: key, v };
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [key],
+  );
+
   return [value, setValue, ready] as const;
 }
 
@@ -67,4 +102,21 @@ export function useHistory<T>(tool: string) {
   const remove = useCallback((id: string) => setItems((prev) => prev.filter((it) => it.id !== id)), [setItems]);
   const clear = useCallback(() => setItems([]), [setItems]);
   return { items, add, update, remove, clear };
+}
+
+/** يحذف كل بيانات وضع المعلم من هذا الجهاز */
+export function clearTeacherData(teacherTools: string[]) {
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k?.startsWith(PREFIX)) continue;
+      const short = k.slice(PREFIX.length);
+      if (short.startsWith("teacher:") || teacherTools.some((t) => short === `history:${t}`)) keys.push(k);
+    }
+    keys.forEach((k) => localStorage.removeItem(k));
+    return keys.length;
+  } catch {
+    return 0;
+  }
 }

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { subjectLabel, type StudyContext } from "@/lib/constants";
 import { toPayload, type PickedImage } from "@/lib/client/image";
 import { useStored } from "@/lib/client/storage";
+import { hideNames } from "@/lib/client/privacy";
 import { ImageInput } from "../ImageInput";
 import { TextTool } from "../TextTool";
 import { Button, Card, EmptyHint, Field, Input, Segmented, TextArea, Toggle, cx } from "../ui";
@@ -13,11 +14,23 @@ function Label({ children }: { children: React.ReactNode }) {
   return <span className="mb-1.5 block text-sm font-bold text-slate-700 dark:text-slate-300">{children}</span>;
 }
 
+/** رفع صفحات من الكتاب المدرسي أو دليل المعلم كمصدر */
+function SourcePages({ files, onChange }: { files: PickedImage[]; onChange: (f: PickedImage[]) => void }) {
+  return (
+    <div>
+      <Label>صفحات من الكتاب أو دليل المعلم (اختياري)</Label>
+      <ImageInput images={files} onChange={onChange} allowPdf label="ارفع صفحات (صور أو PDF)" />
+      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">المساعد يعتمد عليها كمصدر أساسي بدل المعلومات العامة.</p>
+    </div>
+  );
+}
+
 // ===== 📋 تحضير درس =====
 export function LessonPlanTool({ ctx }: { ctx: StudyContext }) {
   const [topic, setTopic] = useState("");
   const [minutes, setMinutes] = useStored("teacher:minutes", 45);
   const [notes, setNotes] = useState("");
+  const [files, setFiles] = useState<PickedImage[]>([]);
   return (
     <TextTool
       tool="lessonPlan"
@@ -31,7 +44,7 @@ export function LessonPlanTool({ ctx }: { ctx: StudyContext }) {
               e.preventDefault();
               if (!topic.trim() || busy) return;
               run({
-                body: { input: topic, minutes, notes },
+                body: { input: topic, minutes, notes, images: toPayload(files) },
                 label: topic,
                 request: `حضّر لي درس: ${topic} (${minutes} دقيقة)`,
               });
@@ -47,6 +60,7 @@ export function LessonPlanTool({ ctx }: { ctx: StudyContext }) {
             <Field label="ملاحظات (اختياري)" hint="مثلاً: عدد الطلاب، الأجهزة المتوفرة، مستوى الصف، أو هدف تبي تركز عليه">
               <TextArea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={1500} />
             </Field>
+            <SourcePages files={files} onChange={setFiles} />
             <Button type="submit" disabled={!topic.trim() || busy}>
               📋 حضّر الدرس
             </Button>
@@ -66,12 +80,14 @@ const Q_TYPES = [
   { id: "match", label: "توصيل" },
   { id: "problem", label: "مسائل" },
   { id: "essay", label: "مقالي" },
+  { id: "hots", label: "تفكير ناقد" },
 ];
 const KINDS = [
   { value: "worksheet", label: "ورقة عمل" },
   { value: "quiz", label: "اختبار قصير" },
   { value: "exam", label: "اختبار شامل" },
   { value: "homework", label: "واجب منزلي" },
+  { value: "bank", label: "🏦 بنك أسئلة" },
 ];
 
 export function WorksheetTool({ ctx }: { ctx: StudyContext }) {
@@ -82,6 +98,9 @@ export function WorksheetTool({ ctx }: { ctx: StudyContext }) {
   const [level, setLevel] = useState("متنوع");
   const [total, setTotal] = useState("");
   const [answerKey, setAnswerKey] = useState(true);
+  const [objectives, setObjectives] = useState("");
+  const [files, setFiles] = useState<PickedImage[]>([]);
+  const bank = kind === "bank";
   const can = topic.trim() && types.length > 0;
   return (
     <TextTool
@@ -97,7 +116,7 @@ export function WorksheetTool({ ctx }: { ctx: StudyContext }) {
               if (!can || busy) return;
               const kindLabel = KINDS.find((k) => k.value === kind)!.label;
               run({
-                body: { input: topic, kind, types, count, level, total: Number(total) || 0, answerKey },
+                body: { input: topic, kind, types, count, level, total: Number(total) || 0, answerKey, objectives, images: toPayload(files) },
                 label: `${kindLabel}: ${topic}`,
                 request: `${kindLabel} في: ${topic}`,
               });
@@ -106,6 +125,14 @@ export function WorksheetTool({ ctx }: { ctx: StudyContext }) {
             <Segmented label="النوع" value={kind} onChange={setKind} options={KINDS} />
             <Field label="الموضوع أو الدروس المشمولة">
               <Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="مثال: الوحدة الثانية — الكسور والعمليات عليها" maxLength={500} />
+            </Field>
+            {bank && (
+              <p className="rounded-xl bg-brand-50 p-3 text-sm text-brand-800 dark:bg-brand-900/30 dark:text-brand-200">
+                🏦 بنك الأسئلة يطلع جدول: كل سؤال مع نوعه ومستوى التفكير (بلوم) والهدف المرتبط والإجابة. يرتبط بأهداف «مرجع المنهج» إذا أضفته.
+              </p>
+            )}
+            <Field label="الأهداف أو المعايير المرتبطة (اختياري)">
+              <Input value={objectives} onChange={(e) => setObjectives(e.target.value)} placeholder="مثال: أن يجمع الطالب كسرين مختلفي المقام" maxLength={1500} />
             </Field>
             <div>
               <Label>أنواع الأسئلة</Label>
@@ -144,8 +171,13 @@ export function WorksheetTool({ ctx }: { ctx: StudyContext }) {
                 <Input type="number" inputMode="numeric" min={0} max={100} value={total} onChange={(e) => setTotal(e.target.value)} placeholder="مثال: 20" />
               </Field>
             </div>
+            <SourcePages files={files} onChange={setFiles} />
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <Toggle checked={answerKey} onChange={setAnswerKey} label="🔑 مفتاح الإجابة" hint="يطلع في آخر الورقة" />
+              {bank ? (
+                <span className="text-sm text-slate-500">الإجابات داخل الجدول</span>
+              ) : (
+                <Toggle checked={answerKey} onChange={setAnswerKey} label="🔑 مفتاح الإجابة" hint="يطلع في آخر الورقة" />
+              )}
               <Button type="submit" disabled={!can || busy}>
                 📄 جهّز الورقة
               </Button>
@@ -256,8 +288,16 @@ export function RubricTool({ ctx }: { ctx: StudyContext }) {
   );
 }
 
-// ===== 🧩 أنشطة متمايزة =====
+// ===== 🧩 أنشطة ووسائل وتجارب =====
+const ACTIVITY_KINDS = [
+  { value: "differentiated", label: "🎚️ متمايزة" },
+  { value: "interactive", label: "🎲 تفاعلية وألعاب" },
+  { value: "experiment", label: "🧪 تجربة عملية" },
+  { value: "aids", label: "🖼️ وسائل تعليمية" },
+];
+
 export function DifferentiateTool({ ctx }: { ctx: StudyContext }) {
+  const [kind, setKind] = useState("differentiated");
   const [topic, setTopic] = useState("");
   const [minutes, setMinutes] = useState(20);
   const [mode, setMode] = useState<"groups" | "individual">("groups");
@@ -265,7 +305,7 @@ export function DifferentiateTool({ ctx }: { ctx: StudyContext }) {
     <TextTool
       tool="differentiate"
       ctx={ctx}
-      empty={<EmptyHint icon="🧩" title="نشاط واحد لكل المستويات" text="أنشطة لنفس الهدف بثلاث مستويات: دعم، أساسي، وإثراء، مع طريقة إدارتها في الصف." />}
+      empty={<EmptyHint icon="🧩" title="أنشطة ووسائل وتجارب" text="أنشطة بثلاث مستويات، أو ألعاب تفاعلية، أو تجربة عملية آمنة، أو وسائل تعليمية للدرس." />}
       form={({ run, busy }) => (
         <Card>
           <form
@@ -273,16 +313,18 @@ export function DifferentiateTool({ ctx }: { ctx: StudyContext }) {
             onSubmit={(e) => {
               e.preventDefault();
               if (!topic.trim() || busy) return;
-              run({ body: { input: topic, minutes, mode }, label: topic, request: `أنشطة متمايزة في: ${topic}` });
+              const kindLabel = ACTIVITY_KINDS.find((k) => k.value === kind)!.label.slice(3);
+              run({ body: { input: topic, minutes, mode, kind }, label: `${kindLabel}: ${topic}`, request: `${kindLabel} في: ${topic}` });
             }}
           >
+            <Segmented label="نوع النشاط" value={kind} onChange={setKind} options={ACTIVITY_KINDS} />
             <Field label="الهدف أو الموضوع">
               <Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="مثال: أن يميّز الطالب بين الفاعل ونائب الفاعل" maxLength={500} />
             </Field>
             <div className="flex flex-wrap items-end gap-x-6 gap-y-4">
               <div>
-                <Label>زمن النشاط</Label>
-                <Segmented label="زمن النشاط" value={minutes} onChange={setMinutes} options={[10, 15, 20, 30].map((n) => ({ value: n, label: `${n} د` }))} />
+                <Label>الزمن</Label>
+                <Segmented label="الزمن" value={minutes} onChange={setMinutes} options={[10, 15, 20, 30, 45].map((n) => ({ value: n, label: `${n} د` }))} />
               </div>
               <div>
                 <Label>طريقة العمل</Label>
@@ -297,7 +339,147 @@ export function DifferentiateTool({ ctx }: { ctx: StudyContext }) {
                 />
               </div>
               <Button type="submit" disabled={!topic.trim() || busy} className="ms-auto">
-                🧩 جهّز الأنشطة
+                🧩 اقترح
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
+    />
+  );
+}
+
+// ===== 🪜 تبسيط المحتوى لمستويات مختلفة =====
+const SIMPLIFY_LEVELS = [
+  { id: "support", label: "🟢 مبسط جداً (دعم)" },
+  { id: "grade", label: "🔵 مستوى الصف" },
+  { id: "advanced", label: "🟣 متقدم (إثراء)" },
+  { id: "l2", label: "🌐 لغير الناطقين بالعربية" },
+];
+
+export function SimplifyTool({ ctx }: { ctx: StudyContext }) {
+  const [text, setText] = useState("");
+  const [files, setFiles] = useState<PickedImage[]>([]);
+  const [levels, setLevels] = useStored<string[]>("teacher:simplify:levels", ["support", "grade", "advanced"]);
+  const [vocab, setVocab] = useState(true);
+  const [questions, setQuestions] = useState(true);
+  const can = (text.trim() || files.length > 0) && levels.length > 0;
+  return (
+    <TextTool
+      tool="simplify"
+      ctx={ctx}
+      empty={<EmptyHint icon="🪜" title="نفس المحتوى لكل المستويات" text="الصق نص من الكتاب أو ارفع صفحاته، ويطلع لك بعدة مستويات قراءة، مع المفردات وأسئلة فهم." />}
+      form={({ run, busy }) => (
+        <Card>
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!can || busy) return;
+              run({
+                body: { input: text, images: toPayload(files), levels, vocab, questions },
+                label: text.trim() ? `تبسيط: ${short(text.trim(), 50)}` : "تبسيط صفحات مرفقة",
+                request: `بسّط هذا المحتوى لمستويات مختلفة: ${short(text, 3000)}`,
+              });
+            }}
+          >
+            <Field label="النص الأصلي">
+              <TextArea rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder="الصق النص هنا، أو ارفع الصفحات تحت…" maxLength={15000} />
+            </Field>
+            <ImageInput images={files} onChange={setFiles} allowPdf />
+            <div>
+              <Label>المستويات المطلوبة</Label>
+              <Chips options={SIMPLIFY_LEVELS} value={levels} onChange={setLevels} />
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <Toggle checked={vocab} onChange={setVocab} label="📖 جدول المفردات" />
+              <Toggle checked={questions} onChange={setQuestions} label="❓ أسئلة فهم لكل مستوى" />
+              <Button type="submit" disabled={!can || busy} className="sm:ms-auto">
+                🪜 بسّط المحتوى
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
+    />
+  );
+}
+
+/** اختيار متعدد على شكل أزرار */
+function Chips({ options, value, onChange }: { options: { id: string; label: string }[]; value: string[]; onChange: (v: string[]) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2" role="group">
+      {options.map((o) => {
+        const on = value.includes(o.id);
+        return (
+          <button
+            key={o.id}
+            type="button"
+            aria-pressed={on}
+            onClick={() => onChange(on ? value.filter((x) => x !== o.id) : [...value, o.id])}
+            className={cx(
+              "rounded-full border px-3 py-1.5 text-sm font-bold transition-colors",
+              on
+                ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-200"
+                : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300",
+            )}
+          >
+            {on ? "✓ " : ""}
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ===== 🤝 دعم الاحتياجات والسقالات =====
+const NEEDS = [
+  { value: "dyslexia", label: "صعوبات القراءة" },
+  { value: "writing", label: "صعوبات الكتابة" },
+  { value: "dyscalculia", label: "صعوبات الحساب" },
+  { value: "adhd", label: "تشتت الانتباه وفرط الحركة" },
+  { value: "autism", label: "طيف التوحد" },
+  { value: "slow", label: "بطء التعلم" },
+  { value: "sensory", label: "ضعف السمع أو البصر" },
+  { value: "anxiety", label: "قلق الاختبارات / ضعف الثقة" },
+  { value: "gifted", label: "الموهوبين والمتفوقين" },
+];
+
+export function ScaffoldTool({ ctx }: { ctx: StudyContext }) {
+  const [need, setNeed] = useState("dyslexia");
+  const [topic, setTopic] = useState("");
+  const [notes, setNotes] = useState("");
+  return (
+    <TextTool
+      tool="scaffold"
+      ctx={ctx}
+      empty={<EmptyHint icon="🤝" title="سقالات وتكييفات عملية" text="اختر نوع الاحتياج والدرس، ويطلع لك سقالات تعليمية، وتكييفات في المهمة والتقييم، واستراتيجيات للصف." />}
+      form={({ run, busy }) => (
+        <Card>
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!topic.trim() || busy) return;
+              const needLabel = NEEDS.find((n) => n.value === need)!.label;
+              run({ body: { need, input: topic, notes }, label: `${needLabel}: ${topic}`, request: `دعم طالب (${needLabel}) في: ${topic}` });
+            }}
+          >
+            <div>
+              <Label>نوع الاحتياج</Label>
+              <Segmented label="نوع الاحتياج" value={need} onChange={setNeed} options={NEEDS} />
+            </div>
+            <Field label="الدرس أو المهمة">
+              <Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="مثال: قراءة نص «الماء سر الحياة» والإجابة عن أسئلته" maxLength={500} />
+            </Field>
+            <Field label="وصف مختصر للحالة (اختياري، بدون أسماء)" hint="مثال: يقرأ ببطء ويتعب من النصوص الطويلة، بس فهمه الشفهي ممتاز">
+              <TextArea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={1500} />
+            </Field>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-slate-500 dark:text-slate-400">هذي مقترحات تربوية، مو تشخيص. نسّق مع الأخصائي في المدرسة.</p>
+              <Button type="submit" disabled={!topic.trim() || busy}>
+                🤝 اقترح الدعم
               </Button>
             </div>
           </form>
@@ -313,6 +495,7 @@ const COMMENT_KINDS = [
   { value: "report", label: "ملاحظة للشهادة" },
   { value: "praise", label: "تعزيز للطالب" },
   { value: "warning", label: "تنبيه لولي الأمر" },
+  { value: "periodic", label: "تقرير دوري" },
 ];
 
 export function CommentsTool({ ctx }: { ctx: StudyContext }) {
@@ -332,15 +515,19 @@ export function CommentsTool({ ctx }: { ctx: StudyContext }) {
               e.preventDefault();
               if (!notes.trim() || busy) return;
               const kindLabel = COMMENT_KINDS.find((k) => k.value === kind)!.label;
+              // الاسم يبقى في جهازك: نرسل [اسم الطالب] ونعوّضه في العرض
+              const aliases = name.trim() ? { "[اسم الطالب]": name.trim() } : undefined;
+              const safeNotes = aliases ? hideNames(notes, aliases) : notes;
               run({
-                body: { kind, studentName: name, input: notes },
+                body: { kind, input: safeNotes },
                 label: `${kindLabel}${name ? `: ${name}` : ""}`,
-                request: `${kindLabel} عن طالب. ملاحظاتي: ${notes}`,
+                request: `${kindLabel} عن [اسم الطالب]. ملاحظاتي: ${safeNotes}`,
+                aliases,
               });
             }}
           >
             <Segmented label="النوع" value={kind} onChange={setKind} options={COMMENT_KINDS} />
-            <Field label="اسم الطالب (اختياري)" hint="إذا تركته فاضي، بيطلع مكانه [اسم الطالب] وتقدر تعدله">
+            <Field label="اسم الطالب (اختياري)" hint="🔒 الاسم ما يُرسل للمساعد: يُستبدل بـ [اسم الطالب] ويرجع في العرض عندك بس">
               <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
             </Field>
             <Field label="ملاحظاتك عن الطالب" hint="باختصار: نقاط القوة، اللي يحتاج تحسين، وأي موقف محدد. لا تكتب معلومات حساسة.">
