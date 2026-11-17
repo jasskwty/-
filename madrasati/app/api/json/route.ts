@@ -74,7 +74,7 @@ export async function POST(req: Request) {
       case "presentation": {
         const count = readInt(body.count, 3, 15, 6);
         const presentation = await generateJson<Presentation>({
-          system: systemPrompt(ctx, TASKS.presentation),
+          system: systemPrompt(ctx, ctx.role === "teacher" ? TASKS.teacherPresentation : TASKS.presentation),
           messages: [
             {
               role: "user",

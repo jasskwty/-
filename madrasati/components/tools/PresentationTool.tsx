@@ -31,7 +31,7 @@ function SlideFrame({ theme, children, dark }: { theme: SlideTheme; children: Re
   );
 }
 
-function TitleSlide({ p, theme, name, meta }: { p: Presentation; theme: SlideTheme; name: string; meta: string }) {
+function TitleSlide({ p, theme, name, meta, byline }: { p: Presentation; theme: SlideTheme; name: string; meta: string; byline: string }) {
   return (
     <SlideFrame theme={theme} dark>
       <div className="absolute inset-x-0 bottom-0 h-[4.5%]" style={{ background: hex(theme.accent) }} />
@@ -44,7 +44,7 @@ function TitleSlide({ p, theme, name, meta }: { p: Presentation; theme: SlideThe
           {p.subtitle}
         </div>
         <div className="mt-[8%] opacity-90" style={{ fontSize: "1.8cqw" }}>
-          {[name && `إعداد الطالب: ${name}`, meta].filter(Boolean).join("   •   ")}
+          {[name && `${byline}: ${name}`, meta].filter(Boolean).join("   •   ")}
         </div>
       </div>
     </SlideFrame>
@@ -77,11 +77,13 @@ function ContentSlide({ s, n, theme }: { s: Presentation["slides"][number]; n: n
 }
 
 export function PresentationTool({ ctx }: { ctx: StudyContext }) {
-  const history = useHistory<DeckState>("presentation");
+  const teacher = ctx.role === "teacher";
+  const byline = teacher ? "إعداد المعلم/ة" : "إعداد الطالب";
+  const history = useHistory<DeckState>(teacher ? "teacher:presentation" : "presentation");
   const [topic, setTopic] = useState("");
   const [count, setCount] = useState(6);
   const [themeId, setThemeId] = useStored("presentation:theme", THEMES[0].id);
-  const [studentName, setStudentName] = useStored("presentation:name", "");
+  const [studentName, setStudentName] = useStored(teacher ? "teacher:presentation:name" : "presentation:name", "");
   const [state, setState] = useState<{ id: string; data: DeckState } | null>(null);
   const [current, setCurrent] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -129,7 +131,7 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
     setDownloading(true);
     setError("");
     try {
-      await downloadPptx(p, { themeId, studentName: studentName.trim(), meta });
+      await downloadPptx(p, { themeId, studentName: studentName.trim(), meta, bylineLabel: byline });
     } catch {
       setError("ما قدرنا نجهز ملف البوربوينت. حاول مرة ثانية.");
     } finally {
@@ -158,7 +160,7 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
               <Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="مثال: الطاقة المتجددة في الكويت" maxLength={300} />
             </Field>
             <Field label="اسمك (يطلع في شريحة العنوان)">
-              <Input value={studentName} onChange={(e) => setStudentName(e.target.value)} placeholder="اسم الطالب" maxLength={60} />
+              <Input value={studentName} onChange={(e) => setStudentName(e.target.value)} placeholder={teacher ? "اسم المعلم/ة" : "اسم الطالب"} maxLength={60} />
             </Field>
             <Field label={`عدد الشرائح: ${count.toLocaleString("ar")} (غير شريحة العنوان)`}>
               <input type="range" min={3} max={15} value={count} onChange={(e) => setCount(Number(e.target.value))} className="mt-3 w-full accent-brand-600" />
@@ -212,7 +214,7 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
 
             <div className="mx-auto max-w-3xl">
               {current === 0 ? (
-                <TitleSlide p={p} theme={theme} name={studentName.trim()} meta={meta} />
+                <TitleSlide p={p} theme={theme} name={studentName.trim()} meta={meta} byline={byline} />
               ) : (
                 <ContentSlide s={p.slides[current - 1]} n={current + 1} theme={theme} />
               )}
@@ -229,7 +231,7 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
               </div>
               {current > 0 && p.slides[current - 1].notes && (
                 <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-800/60">
-                  <span className="font-bold">🎤 ملاحظات المتحدث: </span>
+                  <span className="font-bold">🎤 {teacher ? "ملاحظات للمعلم" : "ملاحظات المتحدث"}: </span>
                   {p.slides[current - 1].notes}
                 </div>
               )}
@@ -244,7 +246,7 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
                   className={cx("w-28 shrink-0 rounded-lg p-0.5 ring-2 transition", i === current ? "ring-brand-500" : "ring-transparent opacity-70 hover:opacity-100")}
                   aria-label={`الشريحة ${i + 1}`}
                 >
-                  {i === 0 ? <TitleSlide p={p} theme={theme} name={studentName.trim()} meta={meta} /> : <ContentSlide s={p.slides[i - 1]} n={i + 1} theme={theme} />}
+                  {i === 0 ? <TitleSlide p={p} theme={theme} name={studentName.trim()} meta={meta} byline={byline} /> : <ContentSlide s={p.slides[i - 1]} n={i + 1} theme={theme} />}
                 </button>
               ))}
             </div>
@@ -252,7 +254,11 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
             <MoreExplainer
               ctx={ctx}
               source={asText}
-              request={`عرض تقديمي عن: ${state!.data.topic}. اشرح لي محتوى العرض بتفصيل أكثر عشان أقدر أقدمه بثقة.`}
+              request={
+                teacher
+                  ? `عرض تقديمي لشرح درس: ${state!.data.topic}. عطني أسئلة نقاش وأنشطة مرافقة لكل شريحة.`
+                  : `عرض تقديمي عن: ${state!.data.topic}. اشرح لي محتوى العرض بتفصيل أكثر عشان أقدر أقدمه بثقة.`
+              }
               extras={state!.data.extras}
               onExtrasChange={(extras) => update({ ...state!.data, extras })}
             />

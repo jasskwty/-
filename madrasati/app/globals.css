@@ -136,3 +136,43 @@ code {
 .prose-ar td {
   @apply border border-slate-200 px-3 py-2 align-top dark:border-slate-700;
 }
+
+/* الطباعة: نطبع النتيجة المختارة فقط */
+@media print {
+  @page {
+    margin: 14mm;
+  }
+  body.print-mode {
+    background: #fff !important;
+  }
+  body.print-mode * {
+    visibility: hidden !important;
+  }
+  body.print-mode [data-print-active],
+  body.print-mode [data-print-active] * {
+    visibility: visible !important;
+  }
+  body.print-mode [data-print-active] {
+    position: absolute !important;
+    inset: 0 0 auto 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+  body.print-mode [data-print-active] > div {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+  body.print-mode .no-print {
+    display: none !important;
+  }
+  body.print-mode table,
+  body.print-mode tr {
+    break-inside: avoid;
+  }
+  body.print-mode h2 {
+    break-after: avoid;
+  }
+}

@@ -17,6 +17,7 @@ export function MoreExplainer({
   extras,
   onExtrasChange,
   actionsExtra,
+  printable,
 }: {
   ctx: StudyContext;
   source: string;
@@ -24,12 +25,14 @@ export function MoreExplainer({
   extras: string[];
   onExtrasChange: (extras: string[]) => void;
   actionsExtra?: React.ReactNode;
+  printable?: boolean;
 }) {
   const [live, setLive] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const abortRef = useRef<AbortController | null>(null);
   const liveRef = useRef<HTMLDivElement>(null);
+  const moreLabel = ctx.role === "teacher" ? "فصّل أكثر" : "اشرح أكثر";
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -59,20 +62,26 @@ export function MoreExplainer({
         onMore={extras.length === 0 ? more : undefined}
         moreBusy={busy}
         extra={actionsExtra}
+        printable={printable}
+        moreLabel={moreLabel}
       />
       {extras.map((t, i) => (
-        <Card key={i} className="mt-4 border-amber-200 bg-amber-50/40 dark:border-amber-900/60 dark:bg-amber-950/10">
-          <div className="mb-2 text-sm font-bold text-amber-700 dark:text-amber-300">💡 شرح إضافي</div>
-          <Markdown>{t}</Markdown>
-          <ResultActions text={t} onMore={i === extras.length - 1 ? more : undefined} moreBusy={busy} />
-        </Card>
+        <div key={i} data-print>
+          <Card className="mt-4 border-amber-200 bg-amber-50/40 dark:border-amber-900/60 dark:bg-amber-950/10">
+            <div className="mb-2 text-sm font-bold text-amber-700 dark:text-amber-300">
+              💡 {ctx.role === "teacher" ? "تفصيل إضافي" : "شرح إضافي"}
+            </div>
+            <Markdown>{t}</Markdown>
+            <ResultActions text={t} onMore={i === extras.length - 1 ? more : undefined} moreBusy={busy} printable={printable} moreLabel={moreLabel} />
+          </Card>
+        </div>
       ))}
       {(busy || error) && (
         <div ref={liveRef} className="mt-4">
           {busy && (
             <Card className="border-amber-200 dark:border-amber-900/60">
               <div className="mb-2 flex items-center gap-2 text-sm font-bold text-amber-700 dark:text-amber-300">
-                <Spinner /> 💡 شرح إضافي
+                <Spinner /> 💡 {ctx.role === "teacher" ? "تفصيل إضافي" : "شرح إضافي"}
               </div>
               {live ? <Markdown>{live}</Markdown> : <p className="text-slate-500">جاري التفكير…</p>}
             </Card>
@@ -100,7 +109,7 @@ export function ResultView({
   onExtrasChange: (extras: string[]) => void;
 }) {
   return (
-    <div>
+    <div data-print>
       <Card>
         {content ? (
           <Markdown>{content}</Markdown>
@@ -119,6 +128,7 @@ export function ResultView({
             request={request}
             extras={extras}
             onExtrasChange={onExtrasChange}
+            printable
           />
         )}
       </Card>

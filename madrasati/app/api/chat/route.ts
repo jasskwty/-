@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     if (messages.at(-1)?.role !== "user") throw new UserFacingError("آخر رسالة لازم تكون من الطالب.");
 
     return await streamTextResponse({
-      system: systemPrompt(ctx, TASKS.chat),
+      system: systemPrompt(ctx, ctx.role === "teacher" ? TASKS.teacherChat : TASKS.chat),
       messages,
       hard: body.hard === true,
       effort: body.hard === true ? "high" : "low",

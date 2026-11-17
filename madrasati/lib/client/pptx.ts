@@ -26,7 +26,7 @@ const FONT = "Arial"; // خط متوفر في كل الأجهزة ويدعم ا�
 
 export async function downloadPptx(
   p: Presentation,
-  opts: { themeId: string; studentName: string; meta: string },
+  opts: { themeId: string; studentName: string; meta: string; bylineLabel?: string },
 ) {
   const { default: PptxGenJS } = await import("pptxgenjs");
   const t = themeById(opts.themeId);
@@ -52,7 +52,7 @@ export async function downloadPptx(
   title.addText(p.subtitle, {
     ...rtl, x: 0.8, y: 3.7, w: W - 2.3, h: 0.9, fontSize: 24, color: t.titleText, align: "right", valign: "top", transparency: 10,
   });
-  const byline = [opts.studentName && `إعداد الطالب: ${opts.studentName}`, opts.meta].filter(Boolean).join("   •   ");
+  const byline = [opts.studentName && `${opts.bylineLabel ?? "إعداد الطالب"}: ${opts.studentName}`, opts.meta].filter(Boolean).join("   •   ");
   title.addText(byline, { ...rtl, x: 0.8, y: 5.6, w: W - 2.3, h: 0.6, fontSize: 16, color: t.titleText, align: "right" });
   title.addNotes(`عرض بعنوان: ${p.title}. ${p.subtitle}`);
 

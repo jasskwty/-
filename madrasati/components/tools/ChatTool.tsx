@@ -27,6 +27,7 @@ interface Conversation {
 
 const MAX_SAVED = 10;
 const MORE_PROMPT = "اشرح أكثر بطريقة أبسط ومع مثال إضافي.";
+const MORE_PROMPT_TEACHER = "فصّل أكثر، وعطني بدائل وأفكار تطبيق عملية في الصف.";
 
 const STARTERS: Record<string, string[]> = {
   math: ["كيف أحل معادلة من الدرجة الثانية؟", "وش الفرق بين المساحة والمحيط؟"],
@@ -38,8 +39,16 @@ const STARTERS: Record<string, string[]> = {
   default: ["لخّص لي أهم أفكار هذا الدرس", "عطني خطة مذاكرة سريعة لهذي المادة"],
 };
 
+const TEACHER_STARTERS = [
+  "عطني ٥ أفكار تهيئة ممتعة لبداية الحصة",
+  "كيف أتعامل مع طالب كثير المقاطعة؟",
+  "اقترح لعبة تعليمية لمراجعة الوحدة",
+  "كيف أشرح مفهوم صعب بطريقة مبسطة؟",
+];
+
 export function ChatTool({ ctx }: { ctx: StudyContext }) {
-  const [saved, setSaved] = useStored<Conversation[]>("chat:conversations", []);
+  const teacher = ctx.role === "teacher";
+  const [saved, setSaved] = useStored<Conversation[]>(teacher ? "teacher:chat:conversations" : "chat:conversations", []);
   const [convId, setConvId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -136,14 +145,14 @@ export function ChatTool({ ctx }: { ctx: StudyContext }) {
     taRef.current?.focus();
   }
 
-  const starters = STARTERS[ctx.subject] ?? STARTERS.default;
+  const starters = teacher ? TEACHER_STARTERS : (STARTERS[ctx.subject] ?? STARTERS.default);
   const canSend = (input.trim() || images.length > 0) && !streaming;
 
   return (
     <div>
       <Card className="flex min-h-[60dvh] flex-col p-0 sm:p-0">
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-          <span className="font-bold">💬 معلم {subjectLabel(ctx.subject)}</span>
+          <span className="font-bold">{teacher ? `💬 مساعدك التربوي — ${subjectLabel(ctx.subject)}` : `💬 معلم ${subjectLabel(ctx.subject)}`}</span>
           <Button variant="ghost" size="sm" onClick={newChat} disabled={!messages.length && !streaming}>
             ✨ محادثة جديدة
           </Button>
@@ -153,10 +162,12 @@ export function ChatTool({ ctx }: { ctx: StudyContext }) {
           {messages.length === 0 && (
             <div className="flex flex-col items-center gap-4 py-8 text-center">
               <span className="text-5xl" aria-hidden>
-                🧑‍🏫
+                {teacher ? "👩‍🏫" : "🧑‍🏫"}
               </span>
               <p className="max-w-sm text-slate-600 dark:text-slate-300">
-                هلا! أنا معلمك الخاص. اسألني أي سؤال في {subjectLabel(ctx.subject)}، أو ارفع صورة من الكتاب أو الواجب.
+                {teacher
+                  ? `هلا أستاذ/ة! اسألني عن أي شي في تدريس ${subjectLabel(ctx.subject)}: أفكار شرح، أنشطة، أسئلة، أو إدارة الصف.`
+                  : `هلا! أنا معلمك الخاص. اسألني أي سؤال في ${subjectLabel(ctx.subject)}، أو ارفع صورة من الكتاب أو الواجب.`}
               </p>
               <div className="flex flex-wrap justify-center gap-2">
                 {starters.map((s) => (
@@ -205,8 +216,8 @@ export function ChatTool({ ctx }: { ctx: StudyContext }) {
                   <div className="mt-2 flex flex-wrap gap-1 border-t border-slate-200 pt-2 dark:border-slate-700">
                     <CopyButton text={m.text} />
                     {i === messages.length - 1 && (
-                      <Button variant="ghost" size="sm" onClick={() => send(MORE_PROMPT)}>
-                        💡 اشرح أكثر
+                      <Button variant="ghost" size="sm" onClick={() => send(teacher ? MORE_PROMPT_TEACHER : MORE_PROMPT)}>
+                        💡 {teacher ? "فصّل أكثر" : "اشرح أكثر"}
                       </Button>
                     )}
                   </div>
@@ -262,7 +273,7 @@ export function ChatTool({ ctx }: { ctx: StudyContext }) {
               </Button>
             )}
           </div>
-          <Toggle checked={hard} onChange={setHard} label="🧠 سؤال صعب" hint="يستخدم موديل أقوى للمسائل المعقدة" />
+          <Toggle checked={hard} onChange={setHard} label={teacher ? "🧠 طلب معقد" : "🧠 سؤال صعب"} hint="يستخدم موديل أقوى للمسائل المعقدة" />
         </form>
       </Card>
 

@@ -37,9 +37,12 @@ export interface ImageData {
   data: string; // base64 بدون البادئة
 }
 
+export type Role = "student" | "teacher";
+
 export interface StudyContext {
   grade: GradeId;
   subject: SubjectId;
+  role: Role;
 }
 
 // علامات التحكم داخل البث النصي (تفصلها الواجهة عن النص)

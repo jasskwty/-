@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { GRADES, SUBJECTS, type GradeId, type SubjectId } from "@/lib/constants";
+import { GRADES, SUBJECTS, type GradeId, type Role, type SubjectId } from "@/lib/constants";
 import { useStored } from "@/lib/client/storage";
 import { cx } from "@/components/ui";
 import { ChatTool } from "@/components/tools/ChatTool";
@@ -8,8 +8,16 @@ import { EssayTool, ExplainTool, ScheduleTool, SolveTool, SummarizeTool } from "
 import { QuizTool } from "@/components/tools/QuizTool";
 import { FlashcardsTool } from "@/components/tools/FlashcardsTool";
 import { PresentationTool } from "@/components/tools/PresentationTool";
+import {
+  CommentsTool,
+  DifferentiateTool,
+  GradeTool,
+  LessonPlanTool,
+  RubricTool,
+  WorksheetTool,
+} from "@/components/tools/TeacherTools";
 
-const TABS = [
+const STUDENT_TABS = [
   { id: "chat", label: "اسأل المعلم", icon: "💬", Comp: ChatTool },
   { id: "explain", label: "اشرح درس", icon: "📘", Comp: ExplainTool },
   { id: "solve", label: "حل واجب", icon: "✏️", Comp: SolveTool },
@@ -20,7 +28,21 @@ const TABS = [
   { id: "presentation", label: "برزنتيشن", icon: "🎞️", Comp: PresentationTool },
   { id: "schedule", label: "جدول مذاكرة", icon: "🗓️", Comp: ScheduleTool },
 ] as const;
-type TabId = (typeof TABS)[number]["id"];
+
+// أدوات المعلم (معرّفاتها مختلفة عشان كل أداة تحتفظ بحالتها الخاصة)
+const TEACHER_TABS = [
+  { id: "t-chat", label: "مساعد تربوي", icon: "💬", Comp: ChatTool },
+  { id: "t-lesson", label: "تحضير درس", icon: "📋", Comp: LessonPlanTool },
+  { id: "t-worksheet", label: "ورقة عمل / اختبار", icon: "📄", Comp: WorksheetTool },
+  { id: "t-grade", label: "تصحيح إجابات", icon: "✅", Comp: GradeTool },
+  { id: "t-rubric", label: "سلّم تقدير", icon: "📏", Comp: RubricTool },
+  { id: "t-diff", label: "أنشطة متمايزة", icon: "🧩", Comp: DifferentiateTool },
+  { id: "t-comments", label: "رسائل وملاحظات", icon: "✉️", Comp: CommentsTool },
+  { id: "t-presentation", label: "برزنتيشن", icon: "🎞️", Comp: PresentationTool },
+] as const;
+
+const ALL_TABS = [...STUDENT_TABS, ...TEACHER_TABS];
+type TabId = (typeof ALL_TABS)[number]["id"];
 
 type Theme = "light" | "dark" | "system";
 
@@ -35,16 +57,18 @@ function ThemeToggle() {
     return () => mq.removeEventListener("change", apply);
   }, [theme, ready]);
   const next: Record<Theme, Theme> = { system: "light", light: "dark", dark: "system" };
-  const label: Record<Theme, string> = { system: "🖥️ تلقائي", light: "☀️ فاتح", dark: "🌙 داكن" };
+  const icon: Record<Theme, string> = { system: "🖥️", light: "☀️", dark: "🌙" };
+  const label: Record<Theme, string> = { system: "تلقائي", light: "فاتح", dark: "داكن" };
   return (
     <button
       type="button"
       onClick={() => setTheme(next[theme])}
-      className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-bold hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+      className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-bold hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
       aria-label="تغيير المظهر"
       title="تغيير المظهر"
     >
-      {label[theme]}
+      {icon[theme]}
+      <span className="hidden sm:inline"> {label[theme]}</span>
     </button>
   );
 }
@@ -52,15 +76,22 @@ function ThemeToggle() {
 export default function Home() {
   const [grade, setGrade] = useStored<GradeId>("grade", "10");
   const [subject, setSubject] = useStored<SubjectId>("subject", "math");
-  const [tab, setTab] = useStored<TabId>("tab", "chat");
+  const [role, setRole] = useStored<Role>("role", "student");
+  const [studentTab, setStudentTab] = useStored<TabId>("tab", "chat");
+  const [teacherTab, setTeacherTab] = useStored<TabId>("teacher:tab", "t-chat");
   const [visited, setVisited] = useState<Set<TabId>>(() => new Set());
+  const teacher = role === "teacher";
+  const TABS = teacher ? TEACHER_TABS : STUDENT_TABS;
+  const stored = teacher ? teacherTab : studentTab;
+  const tab: TabId = TABS.some((t) => t.id === stored) ? stored : TABS[0].id;
+  const setTab = teacher ? setTeacherTab : setStudentTab;
 
   // نخلي الأدوات اللي انفتحت محمّلة عشان ما تضيع نتائجها عند التنقل
   useEffect(() => {
     setVisited((v) => (v.has(tab) ? v : new Set(v).add(tab)));
   }, [tab]);
 
-  const ctx = { grade, subject };
+  const ctx = { grade, subject, role };
 
   return (
     <div className="min-h-dvh">
@@ -73,15 +104,45 @@ export default function Home() {
               </span>
               <div>
                 <h1 className="text-lg leading-tight font-extrabold sm:text-xl">مساعدي المدرسي</h1>
-                <p className="hidden text-xs text-slate-500 sm:block dark:text-slate-400">رفيقك في المذاكرة من السادس إلى الثاني عشر</p>
+                <p className="hidden text-xs text-slate-500 sm:block dark:text-slate-400">
+                  {teacher ? "مساعدك في التحضير والتدريس والتقويم" : "رفيقك في المذاكرة من السادس إلى الثاني عشر"}
+                </p>
               </div>
             </div>
-            <ThemeToggle />
+            <div className="flex items-center gap-2">
+              <div role="group" aria-label="الوضع" className="flex rounded-xl bg-slate-100 p-1 text-sm font-bold dark:bg-slate-800">
+                {(
+                  [
+                    { value: "student", icon: "🎒", label: "طالب" },
+                    { value: "teacher", icon: "👩‍🏫", label: "معلم" },
+                  ] as const
+                ).map((r) => (
+                  <button
+                    key={r.value}
+                    type="button"
+                    aria-pressed={role === r.value}
+                    onClick={() => setRole(r.value)}
+                    className={cx(
+                      "rounded-lg px-2.5 py-1 transition-colors",
+                      role === r.value
+                        ? "bg-white text-brand-700 shadow-sm dark:bg-slate-900 dark:text-brand-300"
+                        : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white",
+                    )}
+                  >
+                    <span className="hidden sm:inline" aria-hidden>
+                      {r.icon}{" "}
+                    </span>
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+              <ThemeToggle />
+            </div>
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:items-center">
             <label className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-1.5 dark:bg-slate-800">
-              <span className="shrink-0 text-xs font-bold text-slate-500 dark:text-slate-400">الصف</span>
+              <span className="shrink-0 text-xs font-bold text-slate-500 dark:text-slate-400">الصف{teacher && <span className="hidden sm:inline"> المستهدف</span>}</span>
               <select
                 value={grade}
                 onChange={(e) => setGrade(e.target.value as GradeId)}
@@ -136,17 +197,19 @@ export default function Home() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-5 sm:py-8">
-        {TABS.map(({ id, Comp }) =>
+        {ALL_TABS.map(({ id, label, Comp }) =>
           visited.has(id) || id === tab ? (
-            <section key={id} role="tabpanel" hidden={id !== tab} aria-label={TABS.find((t) => t.id === id)?.label}>
-              <Comp ctx={ctx} />
+            <section key={id} role="tabpanel" hidden={id !== tab} aria-label={label}>
+              <Comp ctx={{ ...ctx, role: id.startsWith("t-") ? "teacher" : "student" }} />
             </section>
           ) : null,
         )}
       </main>
 
       <footer className="mx-auto max-w-5xl px-4 pb-8 text-center text-xs text-slate-400">
-        المساعد ممكن يغلط أحياناً، راجع المعلومات المهمة مع معلمك وكتابك المدرسي.
+        {teacher
+          ? "المساعد ممكن يغلط أحياناً، راجع المحتوى قبل استخدامه مع الطلاب وطابقه مع دليل المعلم."
+          : "المساعد ممكن يغلط أحياناً، راجع المعلومات المهمة مع معلمك وكتابك المدرسي."}
       </footer>
     </div>
   );
