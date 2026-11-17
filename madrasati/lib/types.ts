@@ -22,7 +22,7 @@ export interface FlashcardDeck {
 
 export type Priority = "high" | "medium" | "low";
 
-export const SLIDE_TYPES = ["bullets", "cards", "steps", "compare", "balance", "stats", "quote", "quiz", "timer"] as const;
+export const SLIDE_TYPES = ["bullets", "cards", "steps", "compare", "balance", "stats", "quote", "quiz", "timer", "problem", "vectors"] as const;
 export type SlideType = (typeof SLIDE_TYPES)[number];
 
 export interface SlideQuizQuestion {
@@ -47,6 +47,25 @@ export interface Slide {
   quiz?: SlideQuizQuestion[];
   stats?: { value: string; label: string }[];
   timer_minutes?: number;
+  /** مسألة محلولة: الحل يطلع خطوة خطوة */
+  problem?: SlideProblem;
+  /** رسم متجهات تفاعلي (رأس بذيل) */
+  vectors?: SlideVector[];
+  unit?: string;
+}
+
+export interface SlideProblem {
+  statement: string;
+  given: string[];
+  required: string;
+  steps: string[];
+  answer: string;
+  source: string; // مصدر المسألة إذا منقولة من اختبار أو بنك أسئلة
+}
+export interface SlideVector {
+  label: string;
+  magnitude: number;
+  angle: number; // بالدرجات من المحور السيني الموجب
 }
 
 /** بند من حصر الدرس في الاختبارات */

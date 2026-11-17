@@ -1,5 +1,31 @@
 import type { Presentation, Slide } from "@/lib/types";
 
+const TICK = String.fromCharCode(96);
+/** يشيل علامات المعادلات (للمعاينة والنص العادي) */
+export const stripTicks = (t: string) => t.split(TICK).join("");
+/** للباوربوينت: المعادلة تنعزل باتجاه من اليسار لليمين داخل النص العربي */
+const isoMath = (t: string) => t.split(TICK).map((seg, i) => (i % 2 ? "\u2066" + seg + "\u2069" : seg)).join("");
+
+/** محصلة المتجهات (رأس بذيل) */
+export function resultant(vs: { magnitude: number; angle: number }[]) {
+  let x = 0;
+  let y = 0;
+  vs.forEach((v) => {
+    x += v.magnitude * Math.cos((v.angle * Math.PI) / 180);
+    y += v.magnitude * Math.sin((v.angle * Math.PI) / 180);
+  });
+  return { x, y, r: Math.hypot(x, y), angle: (Math.atan2(y, x) * 180) / Math.PI };
+}
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/** يطبق دالة على كل النصوص داخل كائن */
+function mapStrings<T>(v: T, f: (s: string) => string): T {
+  if (typeof v === "string") return f(v) as T;
+  if (Array.isArray(v)) return v.map((x) => mapStrings(x, f)) as T;
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, mapStrings(x, f)])) as T;
+  return v;
+}
+
 /** يحوّل أي نوع شريحة لنقاط (لملف PowerPoint والمعاينة المختصرة) */
 export function slideBullets(s: Slide): string[] {
   switch (s.type) {
@@ -21,6 +47,24 @@ export function slideBullets(s: Slide): string[] {
       return [s.subtitle || "", ...s.bullets].filter(Boolean);
     case "steps":
       return s.bullets.map((b, i) => `${i + 1}. ${b}`);
+    case "problem":
+      return s.problem
+        ? [
+            s.problem.statement,
+            ...(s.problem.given.length ? [`المعطيات: ${s.problem.given.join("، ")}`] : []),
+            ...(s.problem.required ? [`المطلوب: ${s.problem.required}`] : []),
+            ...s.problem.steps.map((st, i) => `${i + 1}) ${st}`),
+            ...(s.problem.answer ? [`الجواب: ${s.problem.answer}`] : []),
+          ]
+        : s.bullets;
+    case "vectors": {
+      const u = s.unit ? ` ${s.unit}` : "";
+      const R = resultant(s.vectors ?? []);
+      return [
+        ...(s.vectors ?? []).map((v) => `${v.label} = ${r2(v.magnitude)}${u} بزاوية ${r2(v.angle)}°`),
+        `المحصلة R = ${r2(R.r)}${u} بزاوية ${r2(R.angle)}°`,
+      ];
+    }
     default:
       return s.bullets;
   }
@@ -45,6 +89,7 @@ export interface SlideTheme {
 
 // الألوان بدون # (صيغة pptxgenjs)
 export const THEMES: SlideTheme[] = [
+  { id: "modern", name: "مودرن", bg: "0B1023", titleBg: "070A18", titleText: "FFFFFF", heading: "7DD3FC", text: "E6ECFF", accent: "A78BFA" },
   { id: "royal", name: "كحلي ملكي", bg: "F4F7FF", titleBg: "041E52", titleText: "FFFFFF", heading: "0149AD", text: "0B1220", accent: "3B82F6" },
   { id: "ocean", name: "أزرق كلاسيكي", bg: "FFFFFF", titleBg: "1F5BF0", titleText: "FFFFFF", heading: "1A3AB2", text: "1E293B", accent: "599FFF" },
   { id: "desert", name: "رملي دافئ", bg: "FFF8EE", titleBg: "B45309", titleText: "FFFFFF", heading: "92400E", text: "3F2D1C", accent: "F59E0B" },
@@ -66,6 +111,7 @@ export async function downloadPptx(
   p: Presentation,
   opts: { themeId: string; studentName: string; meta: string; bylineLabel?: string },
 ) {
+  p = mapStrings(p, isoMath);
   const { default: PptxGenJS } = await import("pptxgenjs");
   const t = themeById(opts.themeId);
   const pptx = new PptxGenJS();
@@ -169,6 +215,97 @@ export async function downloadPptx(
         );
       });
       if (notes) ans.addNotes(notes);
+      return;
+    }
+
+    if (type === "problem" && s.problem) {
+      const P = s.problem;
+      // شريحة المسألة
+      const q = frame(s, `${s.title} — المسألة`);
+      card(q, X0, Y0, BW, 2.0);
+      q.addText(P.statement, { ...rtl, x: X0 + 0.25, y: Y0 + 0.1, w: BW - 0.5, h: 1.8, fontSize: 22, color: t.text, align: "right", valign: "middle", fit: "shrink" });
+      let yy = Y0 + 2.25;
+      if (P.given.length) {
+        q.addText("المعطيات", { ...rtl, x: X0, y: yy, w: BW, h: 0.45, fontSize: 18, bold: true, color: t.accent, align: "right" });
+        const gw = Math.min(3.4, (BW - 0.2 * (P.given.length - 1)) / P.given.length);
+        P.given.forEach((g, k) => {
+          const x = X0 + BW - (k + 1) * gw - k * 0.2;
+          q.addText(g, { ...rtl, x, y: yy + 0.5, w: gw, h: 0.6, fontSize: 17, color: t.text, align: "center", valign: "middle", fit: "shrink", fill: { color: dark ? "1E293B" : "EEF3FF" }, line: { color: cardLine, width: 1 }, rectRadius: 0.3, shape: pptx.ShapeType.roundRect });
+        });
+        yy += 1.3;
+      }
+      if (P.required) {
+        q.addText([{ text: "المطلوب: ", options: { ...rtl, bold: true, color: t.accent } }, { text: P.required, options: { ...rtl, color: t.text } }], { ...rtl, x: X0, y: yy, w: BW, h: 0.8, fontSize: 19, align: "right", valign: "top", fit: "shrink" });
+      }
+      if (P.source) q.addText(`المصدر: ${P.source}`, { ...rtl, x: X0 + 1, y: H - 0.75, w: BW - 1, h: 0.4, fontSize: 11, color: t.accent, align: "right", fit: "shrink" });
+      if (notes) q.addNotes(notes);
+      // شريحة الحل
+      const sol = frame(s, `${s.title} — الحل`);
+      const n = P.steps.length + (P.answer ? 1 : 0);
+      const rh = Math.min(0.8, BH / n - 0.1);
+      P.steps.forEach((st, k) => {
+        const y = Y0 + k * (rh + 0.1);
+        sol.addShape(pptx.ShapeType.ellipse, { x: X0 + BW - rh * 0.8, y: y + rh * 0.1, w: rh * 0.8, h: rh * 0.8, fill: { color: t.heading } });
+        sol.addText(`${k + 1}`, { ...rtl, x: X0 + BW - rh * 0.8, y: y + rh * 0.1, w: rh * 0.8, h: rh * 0.8, fontSize: 15, bold: true, color: dark ? "0B1023" : "FFFFFF", align: "center", valign: "middle" });
+        card(sol, X0, y, BW - rh, rh);
+        sol.addText(st, { ...rtl, x: X0 + 0.2, y, w: BW - rh - 0.4, h: rh, fontSize: 18, color: t.text, align: "right", valign: "middle", fit: "shrink" });
+      });
+      if (P.answer) {
+        const y = Y0 + P.steps.length * (rh + 0.1);
+        card(sol, X0, y, BW, rh, dark ? "14532D" : "DCFCE7", "16A34A");
+        sol.addText([{ text: "الجواب: ", options: { ...rtl, bold: true } }, { text: P.answer, options: { ...rtl, bold: true } }], { ...rtl, x: X0 + 0.25, y, w: BW - 0.5, h: rh, fontSize: 20, color: dark ? "BBF7D0" : "166534", align: "right", valign: "middle", fit: "shrink" });
+      }
+      return;
+    }
+
+    if (type === "vectors" && (s.vectors?.length ?? 0) >= 2) {
+      const vs = s.vectors!;
+      const u = s.unit ? ` ${s.unit}` : "";
+      const slide = frame(s);
+      if (notes) slide.addNotes(notes);
+      // النقاط رأس بذيل
+      const pts = [[0, 0]];
+      vs.forEach((v) => {
+        const [px, py] = pts[pts.length - 1];
+        pts.push([px + v.magnitude * Math.cos((v.angle * Math.PI) / 180), py + v.magnitude * Math.sin((v.angle * Math.PI) / 180)]);
+      });
+      const xs = pts.map((q) => q[0]);
+      const ys = pts.map((q) => q[1]);
+      const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+      const AW = 7.2, AH = BH, AX = X0, AY = Y0;
+      card(slide, AX, AY, AW, AH);
+      const sc = Math.min((AW - 1.4) / Math.max(maxX - minX, 1e-6), (AH - 1.2) / Math.max(maxY - minY, 1e-6));
+      const ox = AX + (AW - (maxX - minX) * sc) / 2;
+      const oy = AY + (AH - (maxY - minY) * sc) / 2;
+      const map = (q: number[]) => [ox + (q[0] - minX) * sc, oy + (maxY - q[1]) * sc];
+      const COLORS = [t.heading, t.accent, "10B981", "F59E0B"];
+      const seg = (a: number[], b: number[], color: string, label: string, dash = false) => {
+        const [x1, y1] = map(a);
+        const [x2, y2] = map(b);
+        slide.addShape(pptx.ShapeType.line, {
+          x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.max(Math.abs(x2 - x1), 0.001), h: Math.max(Math.abs(y2 - y1), 0.001),
+          flipH: x2 < x1, flipV: y2 < y1,
+          line: { color, width: 3.5, endArrowType: "triangle", ...(dash ? { dashType: "dash" as const } : {}) },
+        });
+        const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1;
+        slide.addText(label, { x: (x1 + x2) / 2 + (dy / L) * 0.35 - 1, y: (y1 + y2) / 2 - (dx / L) * 0.35 - 0.2, w: 2, h: 0.4, fontSize: 14, bold: true, color, align: "center", valign: "middle", fontFace: FONT });
+      };
+      vs.forEach((v, k) => seg(pts[k], pts[k + 1], COLORS[k % COLORS.length], `${v.label} = ${r2(v.magnitude)}${u}`));
+      const R = resultant(vs);
+      seg(pts[0], pts[pts.length - 1], "E11D48", `R = ${r2(R.r)}${u}`, true);
+      // القيم
+      const PX = AX + AW + 0.3, PW = BW - AW - 0.3;
+      card(slide, PX, AY, PW, AH);
+      slide.addText(
+        [
+          ...vs.map((v, k) => ({ text: `${v.label} = ${r2(v.magnitude)}${u} ، ${r2(v.angle)}°`, options: { ...rtl, breakLine: true, color: COLORS[k % COLORS.length], bold: true } })),
+          { text: " ", options: { breakLine: true } },
+          { text: `Rx = ${r2(R.x)}   ،   Ry = ${r2(R.y)}`, options: { ...rtl, breakLine: true, color: t.text } },
+          { text: `R = ${r2(R.r)}${u}`, options: { ...rtl, breakLine: true, bold: true, color: "E11D48", fontSize: 24 } },
+          { text: `α = ${r2(R.angle)}° مع المحور السيني`, options: { ...rtl, color: t.text } },
+        ],
+        { ...rtl, x: PX + 0.2, y: AY + 0.2, w: PW - 0.4, h: AH - 0.4, fontSize: 17, align: "right", valign: "middle", fit: "shrink", lineSpacingMultiple: 1.3 },
+      );
       return;
     }
 

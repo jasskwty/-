@@ -52,6 +52,16 @@ const SLIDES_SCHEMA = obj({
       quiz: { type: "array", items: obj({ question: str, options: { type: "array", items: str }, answer_index: { type: "integer" } }) },
       stats: { type: "array", items: obj({ value: str, label: str }) },
       timer_minutes: { type: "integer" },
+      problem: obj({
+        statement: str,
+        given: { type: "array", items: str },
+        required: str,
+        steps: { type: "array", items: str },
+        answer: str,
+        source: str,
+      }),
+      vectors: { type: "array", items: obj({ label: str, magnitude: { type: "number" }, angle: { type: "number" } }) },
+      unit: str,
     }),
   },
 });
@@ -77,11 +87,29 @@ function cleanSlide(sl: Slide, focus: boolean): Slide {
     quiz,
     stats: (sl.stats ?? []).filter((x) => x.value?.trim()),
     timer_minutes: Math.min(60, Math.max(0, (sl.timer_minutes ?? 0) | 0)),
+    unit: (sl.unit ?? "").slice(0, 20),
+    vectors: (sl.vectors ?? [])
+      .filter((v) => Number.isFinite(v.magnitude) && v.magnitude > 0 && Number.isFinite(v.angle))
+      .slice(0, 4)
+      .map((v, i) => ({ label: (v.label || String.fromCharCode(97 + i)).slice(0, 8), magnitude: Math.min(1e6, v.magnitude), angle: ((v.angle % 360) + 360) % 360 })),
+    problem:
+      sl.problem && sl.problem.statement?.trim()
+        ? {
+            statement: sl.problem.statement,
+            given: arr(sl.problem.given),
+            required: sl.problem.required ?? "",
+            steps: arr(sl.problem.steps),
+            answer: sl.problem.answer ?? "",
+            source: sl.problem.source ?? "",
+          }
+        : undefined,
   };
   // إذا النوع ناقص بياناته، نرجعه نقاط عادية
   if ((type === "quiz" && !quiz.length) || (type === "stats" && !out.stats!.length) || ((type === "compare" || type === "balance") && !out.right_items!.length && !out.left_items!.length))
     out.type = "bullets";
   if (type === "timer" && !out.timer_minutes) out.timer_minutes = 5;
+  if (type === "problem" && (!out.problem || !out.problem.steps.length)) out.type = "bullets";
+  if (type === "vectors" && out.vectors!.length < 2) out.type = "bullets";
   return out;
 }
 

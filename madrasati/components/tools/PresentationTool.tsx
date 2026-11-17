@@ -5,7 +5,7 @@ import type { ExamFocus, ExamFocusItem, Presentation } from "@/lib/types";
 import { ExamFocusPanel, PriorityBadge, SECONDARY_GRADES } from "../ExamFocusPanel";
 import { postJson } from "@/lib/client/stream";
 import { useHistory, useStored, type HistoryItem } from "@/lib/client/storage";
-import { downloadPptx, slideBullets, THEMES, themeById, type SlideTheme } from "@/lib/client/pptx";
+import { downloadPptx, slideBullets, stripTicks, THEMES, themeById, type SlideTheme } from "@/lib/client/pptx";
 import { buildHtmlDeck } from "@/lib/client/htmlDeck";
 import { toPayload, type PickedImage } from "@/lib/client/image";
 import { ImageInput } from "../ImageInput";
@@ -24,6 +24,8 @@ const TYPE_LABEL: Record<string, string> = {
   quote: "فكرة محورية",
   quiz: "اختبار تفاعلي",
   timer: "مؤقت نشاط",
+  problem: "مسألة محلولة",
+  vectors: "رسم متجهات تفاعلي",
 };
 
 interface DeckState {
@@ -81,11 +83,11 @@ function ContentSlide({ s, n, theme }: { s: Presentation["slides"][number]; n: n
           className={cx("font-bold leading-tight", (s.priority === "high" || s.priority === "medium") && "pl-[17%]")}
           style={{ fontSize: "3.6cqw", color: hex(theme.heading) }}
         >
-          {s.title}
+          {stripTicks(s.title)}
         </div>
         <div className="mt-[1.5%] h-[1%] w-[19%]" style={{ background: hex(theme.accent) }} />
         <ul className="mt-[3.5%] space-y-[1.2cqw]" style={{ fontSize: "2.3cqw", color: hex(theme.text) }}>
-          {slideBullets(s).map((b, i) => (
+          {slideBullets(s).map(stripTicks).map((b, i) => (
             <li key={i} className="flex gap-[1.2cqw]">
               <span style={{ color: hex(theme.accent) }}>●</span>
               <span>{b}</span>
@@ -198,7 +200,7 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
 
   const asText = p
     ? `# ${p.title}\n${p.subtitle}\n\n${p.slides
-        .map((s, i) => `## ${i + 1}. ${s.title}\n${slideBullets(s).map((b) => `- ${b}`).join("\n")}\n\n> ملاحظات: ${s.notes}`)
+        .map((s, i) => `## ${i + 1}. ${s.title}\n${slideBullets(s).map((b) => `- ${stripTicks(b)}`).join("\n")}\n\n> ملاحظات: ${s.notes}`)
         .join("\n\n")}`
     : "";
 
