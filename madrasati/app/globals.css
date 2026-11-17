@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: var(--font-tajawal), ui-sans-serif, system-ui, sans-serif;
+  --color-brand-50: #eef6ff;
+  --color-brand-100: #d9eaff;
+  --color-brand-200: #bcdaff;
+  --color-brand-300: #8ec2ff;
+  --color-brand-400: #599fff;
+  --color-brand-500: #3479fb;
+  --color-brand-600: #1f5bf0;
+  --color-brand-700: #1846dc;
+  --color-brand-800: #1a3ab2;
+  --color-brand-900: #1b368c;
+}
+
+:root {
+  color-scheme: light;
+}
+.dark {
+  color-scheme: dark;
+}
+
+html,
+body {
+  @apply bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100;
+}
+
+body {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* المعادلات والأكواد دايماً من اليسار لليمين */
+.katex,
+.katex-display,
+pre,
+code {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.25rem 0;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+/* البطاقات المقلوبة */
+.flip-scene {
+  perspective: 1200px;
+}
+.flip-card {
+  transform-style: preserve-3d;
+  transition: transform 0.6s cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+.flip-card.flipped {
+  transform: rotateY(180deg);
+}
+.flip-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.flip-back {
+  transform: rotateY(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .flip-card {
+    transition: none;
+  }
+}
+
+/* تنسيق الردود */
+.prose-ar {
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+.prose-ar h1 {
+  @apply mt-5 mb-3 text-xl font-extrabold;
+}
+.prose-ar h2 {
+  @apply mt-6 mb-2 text-lg font-bold text-brand-700 dark:text-brand-300;
+}
+.prose-ar h3 {
+  @apply mt-4 mb-2 text-base font-bold;
+}
+.prose-ar > :first-child {
+  @apply mt-0;
+}
+.prose-ar p {
+  @apply my-2;
+}
+.prose-ar ul {
+  @apply my-2 list-disc ps-6;
+}
+.prose-ar ol {
+  @apply my-2 list-decimal ps-6;
+}
+.prose-ar li {
+  @apply my-1;
+}
+.prose-ar strong {
+  @apply font-bold text-slate-900 dark:text-white;
+}
+.prose-ar a {
+  @apply text-brand-600 underline dark:text-brand-300;
+}
+.prose-ar blockquote {
+  @apply my-3 rounded-lg border-s-4 border-amber-400 bg-amber-50 px-4 py-2 dark:bg-amber-950/40;
+}
+.prose-ar hr {
+  @apply my-5 border-slate-200 dark:border-slate-700;
+}
+.prose-ar code {
+  @apply rounded bg-slate-100 px-1.5 py-0.5 text-sm dark:bg-slate-800;
+}
+.prose-ar pre {
+  @apply my-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100;
+}
+.prose-ar pre code {
+  @apply bg-transparent p-0;
+}
+.prose-ar table {
+  @apply w-full border-collapse text-sm;
+}
+.prose-ar th {
+  @apply border border-slate-200 bg-slate-100 px-3 py-2 text-start font-bold dark:border-slate-700 dark:bg-slate-800;
+}
+.prose-ar td {
+  @apply border border-slate-200 px-3 py-2 align-top dark:border-slate-700;
+}

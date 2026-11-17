@@ -1,0 +1,116 @@
+"use client";
+import { useRef, useState } from "react";
+import { fileToImage, type PickedImage } from "@/lib/client/image";
+import { Button } from "./ui";
+
+export function ImageInput({
+  images,
+  onChange,
+  max = 4,
+  compact = false,
+}: {
+  images: PickedImage[];
+  onChange: (imgs: PickedImage[]) => void;
+  max?: number;
+  compact?: boolean;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const camRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function addFiles(files: FileList | File[] | null) {
+    if (!files?.length) return;
+    setError("");
+    setBusy(true);
+    try {
+      const list = Array.from(files).slice(0, Math.max(0, max - images.length));
+      if (!list.length) throw new Error(`تقدر ترفع ${max} صور كحد أقصى.`);
+      const picked = await Promise.all(list.map(fileToImage));
+      onChange([...images, ...picked]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "ما قدرنا نضيف الصورة.");
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+      if (camRef.current) camRef.current.value = "";
+    }
+  }
+
+  return (
+    <div
+      onPaste={(e) => {
+        const files = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/"));
+        if (files.length) {
+          e.preventDefault();
+          e.stopPropagation();
+          void addFiles(files);
+        }
+      }}
+    >
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => void addFiles(e.target.files)}
+        data-testid="image-file"
+      />
+      <input
+        ref={camRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => void addFiles(e.target.files)}
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => fileRef.current?.click()}
+          disabled={busy || images.length >= max}
+          aria-label="ارفع صورة"
+        >
+          🖼️ {compact ? "" : "ارفع صورة"}
+        </Button>
+        {!compact && (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="sm:hidden"
+            onClick={() => camRef.current?.click()}
+            disabled={busy || images.length >= max}
+          >
+            📷 صوّر
+          </Button>
+        )}
+        {busy && <span className="text-sm text-slate-500">جاري تجهيز الصورة…</span>}
+      </div>
+      {images.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {images.map((img) => (
+            <div key={img.id} className="group relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={img.preview}
+                alt="صورة مرفقة"
+                className="size-20 rounded-xl border border-slate-200 object-cover dark:border-slate-700"
+              />
+              <button
+                type="button"
+                onClick={() => onChange(images.filter((i) => i.id !== img.id))}
+                className="absolute -top-2 -left-2 flex size-6 items-center justify-center rounded-full bg-slate-800 text-xs text-white shadow"
+                aria-label="احذف الصورة"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
+    </div>
+  );
+}
