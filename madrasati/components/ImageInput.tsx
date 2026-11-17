@@ -11,7 +11,9 @@ export function ImageInput({
   compact = false,
   allowPdf = false,
   label,
+  noLibrary = false,
 }: {
+  noLibrary?: boolean;
   images: PickedImage[];
   onChange: (imgs: PickedImage[]) => void;
   max?: number;
@@ -97,7 +99,7 @@ export function ImageInput({
             📷 صوّر
           </Button>
         )}
-        {allowPdf && (
+        {allowPdf && !noLibrary && (
           <Button variant="secondary" size="sm" onClick={() => setPicker(true)} disabled={full} aria-label="صفحات من مكتبة الوزارة">
             📚 {compact ? "" : "من كتب الوزارة"}
           </Button>
@@ -139,7 +141,7 @@ export function ImageInput({
           ))}
         </div>
       )}
-      {allowPdf && !full && <InboxChips onTake={addOne} />}
+      {allowPdf && !noLibrary && !full && <InboxChips onTake={addOne} />}
       {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
       {picker && <LibraryPickerDialog onClose={() => setPicker(false)} onAdd={addOne} />}
     </div>

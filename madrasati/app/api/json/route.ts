@@ -1,5 +1,5 @@
 import { generateJson, jsonError, UserFacingError } from "@/lib/server/claude";
-import { readBody, readContext, readInt, readText, systemPrompt, TASKS } from "@/lib/server/prompts";
+import { readBody, readContext, readImages, readInt, readText, systemPrompt, TASKS, userContent } from "@/lib/server/prompts";
 import type { FlashcardDeck, Presentation, Quiz } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -37,12 +37,55 @@ const SLIDES_SCHEMA = obj({
   slides: { type: "array", items: obj({ title: str, bullets: { type: "array", items: str }, notes: str }) },
 });
 
+const ROSTER_SCHEMA = obj({
+  classes: {
+    type: "array",
+    items: obj({ name: str, grade: str, students: { type: "array", items: str }, unclear: { type: "array", items: str } }),
+  },
+  warnings: str,
+});
+interface Roster {
+  classes: { name: string; grade: string; students: string[]; unclear: string[] }[];
+  warnings: string;
+}
+const GRADES_OK = ["6", "7", "8", "9", "10", "11", "12"];
+// احتياط: نشيل أي رقم طويل (مثل الرقم المدني أو الهاتف) لو وصل بالغلط
+const cleanName = (n: string) => n.replace(/[0-9٠-٩]{4,}/g, "").replace(/\s+/g, " ").trim();
+
 const DIFFICULTY: Record<string, string> = { easy: "سهل", medium: "متوسط", hard: "صعب" };
 
 export async function POST(req: Request) {
   try {
     const body = await readBody(req);
     const ctx = readContext(body);
+
+    // قراءة كشف الطلاب من الصور (وضع المعلم)
+    if (body.tool === "roster") {
+      const images = readImages(body.images, 8);
+      if (!images.length) throw new UserFacingError("صوّر الكشف أو ارفع ملفه أول.");
+      const roster = await generateJson<Roster>({
+        system: systemPrompt({ ...ctx, role: "teacher", reference: "" }, TASKS.roster),
+        messages: [{ role: "user", content: userContent(`اقرأ ${images.length > 1 ? `هذي الكشوف (${images.length} مرفقات)` : "هذا الكشف"} واستخرج أسماء الطلاب لكل فصل.`, images) }],
+        schema: ROSTER_SCHEMA,
+        hard: true, // قراءة الخط والأسماء تحتاج دقة
+      });
+      roster.classes = roster.classes
+        .map((c, i) => {
+          const seen = new Set<string>();
+          const students = c.students.map(cleanName).filter((n) => n.length > 1 && !seen.has(n) && seen.add(n));
+          return {
+            name: c.name.trim().slice(0, 40) || `فصل ${i + 1}`,
+            grade: GRADES_OK.includes(c.grade.trim()) ? c.grade.trim() : "",
+            students,
+            unclear: (c.unclear ?? []).map(cleanName).filter(Boolean),
+          };
+        })
+        .filter((c) => c.students.length > 0);
+      if (!roster.classes.length)
+        throw new UserFacingError(roster.warnings || "ما قدرنا نقرأ أسماء من الصورة. صوّر الكشف بشكل أوضح وبإضاءة أفضل.", 422);
+      return Response.json(roster);
+    }
+
     const topic = readText(body.topic, "الموضوع", { max: 2000 });
 
     switch (body.tool) {

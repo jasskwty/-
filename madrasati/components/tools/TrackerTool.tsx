@@ -4,6 +4,8 @@ import { gradeLabel, subjectLabel, type StudyContext } from "@/lib/constants";
 import { useStored } from "@/lib/client/storage";
 import { hideNames, type Aliases } from "@/lib/client/privacy";
 import { TextTool } from "../TextTool";
+import { RosterImport, type RosterImportItem } from "../RosterImport";
+import { normalizeAr } from "@/lib/subjectMatch";
 import { Button, Card, EmptyHint, Field, Input, Segmented, Select, TextArea, cx } from "../ui";
 
 // ===== نموذج البيانات (ينحفظ في متصفح المعلم فقط) =====
@@ -126,6 +128,53 @@ export function TrackerTool({ ctx }: { ctx: StudyContext }) {
   const [activeId, setActiveId] = useStored<string>("teacher:tracker:active", "");
   const [view, setView] = useState<"grades" | "analysis" | "followups">("grades");
   const [newClass, setNewClass] = useState("");
+  const [rosterOpen, setRosterOpen] = useState(false);
+  const [notice, setNotice] = useState("");
+
+  /** يضيف الفصول المقروءة من الكشف: فصول جديدة أو دمج بدون تكرار */
+  function importRoster(items: RosterImportItem[]) {
+    let firstId = "";
+    let added = 0;
+    let skipped = 0;
+    let next = [...classes];
+    for (const it of items) {
+      if (it.target === "new") {
+        const c: ClassRec = {
+          id: uid(),
+          name: it.name,
+          grade: it.grade || ctx.grade,
+          subject: ctx.subject,
+          students: it.students.map((name) => ({ id: uid(), name, note: "" })),
+          assessments: [],
+          scores: {},
+          followups: [],
+        };
+        added += c.students.length;
+        next.push(c);
+        firstId ||= c.id;
+      } else {
+        next = next.map((c) => {
+          if (c.id !== it.target) return c;
+          const have = new Set(c.students.map((st) => normalizeAr(st.name)));
+          const fresh: string[] = [];
+          for (const n of it.students) {
+            const k = normalizeAr(n);
+            if (have.has(k)) skipped++;
+            else {
+              have.add(k);
+              fresh.push(n);
+            }
+          }
+          added += fresh.length;
+          firstId ||= c.id;
+          return { ...c, students: [...c.students, ...fresh.map((name) => ({ id: uid(), name, note: "" }))] };
+        });
+      }
+    }
+    setClasses(next);
+    if (firstId) setActiveId(firstId);
+    setNotice(`✅ أضفنا ${added} طالب${skipped ? ` (وتجاهلنا ${skipped} اسم موجود من قبل)` : ""} في ${items.length} ${items.length === 1 ? "فصل" : "فصول"}.`);
+  }
 
   const cls = classes.find((c) => c.id === activeId) ?? classes[0];
   const update = (fn: (c: ClassRec) => ClassRec) => setClasses((xs) => xs.map((c) => (c.id === cls?.id ? fn(c) : c)));
@@ -170,6 +219,7 @@ export function TrackerTool({ ctx }: { ctx: StudyContext }) {
               ➕ أضف
             </Button>
           </form>
+          <Button onClick={() => setRosterOpen(true)}>📷 صوّر الكشف</Button>
           {cls && (
             <Button
               variant="danger"
@@ -189,8 +239,24 @@ export function TrackerTool({ ctx }: { ctx: StudyContext }) {
         </p>
       </Card>
 
+      {notice && (
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200" role="status">
+          <span className="flex-1">{notice} راجع الأسماء في الجدول.</span>
+          <button type="button" onClick={() => setNotice("")} aria-label="إخفاء">
+            ✕
+          </button>
+        </div>
+      )}
+      {rosterOpen && (
+        <RosterImport
+          ctx={ctx}
+          existing={classes.map((c) => ({ id: c.id, name: c.name }))}
+          onClose={() => setRosterOpen(false)}
+          onImport={importRoster}
+        />
+      )}
       {!cls ? (
-        <EmptyHint icon="📊" title="سجل متابعة الطلاب" text="أضف فصل، وبعدها الطلاب والتقييمات. السجل يحسب المعدلات ويحدد اللي يحتاج دعم، والمساعد يحلل ويقترح مسارات وتقارير." />
+        <EmptyHint icon="📊" title="سجل متابعة الطلاب" text="صوّر كشف الفصل (أو كشوف كل فصولك مرة وحدة) بزر «📷 صوّر الكشف»، أو أضف فصل وطلاب يدوياً. السجل يحسب المعدلات ويحدد اللي يحتاج دعم، والمساعد يحلل ويقترح مسارات وتقارير." />
       ) : (
         <>
           <Segmented
