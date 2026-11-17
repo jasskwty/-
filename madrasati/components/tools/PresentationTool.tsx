@@ -10,6 +10,7 @@ import { buildHtmlDeck } from "@/lib/client/htmlDeck";
 import { toPayload, type PickedImage } from "@/lib/client/image";
 import { ImageInput } from "../ImageInput";
 import { Dialog } from "../LibraryPicker";
+import { CopyButton } from "../ResultActions";
 import { HistoryPanel } from "../HistoryPanel";
 import { MoreExplainer } from "../ResultView";
 import { Button, Card, EmptyHint, ErrorBox, Field, Input, Loading, Segmented, Spinner, TextArea, Toggle, cx } from "../ui";
@@ -106,7 +107,6 @@ function ContentSlide({ s, n, theme }: { s: Presentation["slides"][number]; n: n
 
 export function PresentationTool({ ctx }: { ctx: StudyContext }) {
   const teacher = ctx.role === "teacher";
-  const byline = teacher ? "إعداد المعلم/ة" : "إعداد الطالب";
   const history = useHistory<DeckState>(teacher ? "teacher:presentation" : "presentation");
   const [topic, setTopic] = useState("");
   const [focus, setFocus] = useState<FocusValue | null>(null);
@@ -116,10 +116,15 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
   const [timer, setTimer] = useStored("presentation:timer", 0);
   const [varied, setVaried] = useStored("presentation:varied", true);
   const [htmlOpen, setHtmlOpen] = useState(false);
+  const [htmlTab, setHtmlTab] = useState<"show" | "code">("show");
+  const [format, setFormat] = useStored<"both" | "pptx" | "html">("presentation:format", "both");
   const secondary = SECONDARY_GRADES.includes(ctx.grade);
   const [count, setCount] = useState(6);
   const [themeId, setThemeId] = useStored("presentation:theme", THEMES[0].id);
   const [studentName, setStudentName] = useStored(teacher ? "teacher:presentation:name" : "presentation:name", "");
+  // أكثر من اسم (فاصلة أو «و» بين الأسماء) ← صيغة الجمع
+  const many = /[،,]|\sو\s/.test(studentName.trim()) || studentName.trim().split(/\s+/).length >= 5;
+  const byline = teacher ? (many ? "إعداد المعلمين" : "إعداد المعلم/ة") : many ? "إعداد الطلاب" : "إعداد الطالب";
   const [state, setState] = useState<{ id: string; data: DeckState } | null>(null);
   const [current, setCurrent] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -232,8 +237,13 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
             <Field label="موضوع العرض" className="sm:col-span-2">
               <Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="مثال: الطاقة المتجددة في الكويت" maxLength={300} />
             </Field>
-            <Field label="اسمك (يطلع في شريحة العنوان)">
-              <Input value={studentName} onChange={(e) => setStudentName(e.target.value)} placeholder={teacher ? "اسم المعلم/ة" : "اسم الطالب"} maxLength={60} />
+            <Field label="اسمك أو أسماء الفريق (تطلع في شريحة العنوان)">
+              <Input
+                value={studentName}
+                onChange={(e) => setStudentName(e.target.value)}
+                placeholder={teacher ? "اسم المعلم/ة" : "اسمك، أو أسماء الفريق: فلان، فلان و فلان"}
+                maxLength={150}
+              />
             </Field>
             <Field label={`عدد الشرائح: ${count.toLocaleString("ar")} (غير شريحة العنوان)`}>
               <input type="range" min={3} max={15} value={count} onChange={(e) => setCount(Number(e.target.value))} className="mt-3 w-full accent-brand-600" />
@@ -262,6 +272,19 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
                 </button>
               ))}
             </div>
+          </div>
+          <div>
+            <span className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-300">صيغة العرض</span>
+            <Segmented
+              label="صيغة العرض"
+              value={format}
+              onChange={setFormat}
+              options={[
+                { value: "pptx", label: "📊 باوربوينت" },
+                { value: "html", label: "💻 كود (HTML تفاعلي)" },
+                { value: "both", label: "الاثنين" },
+              ]}
+            />
           </div>
           <details className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
             <summary className="cursor-pointer font-bold">📄 المحتوى (اختياري): الصق الدرس أو أضف صفحات الكتاب</summary>
@@ -311,13 +334,27 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <span className="font-bold">معاينة الشرائح</span>
               <div className="flex flex-wrap gap-2">
-                <Button onClick={() => setHtmlOpen(true)}>▶ العرض التفاعلي</Button>
-                <Button variant="secondary" onClick={downloadHtml}>
-                  ⬇️ ملف ‎.html
-                </Button>
-                <Button variant="secondary" onClick={download} disabled={downloading}>
-                  {downloading ? <Spinner /> : "⬇️"} ملف ‎.pptx
-                </Button>
+                {format !== "pptx" && (
+                  <>
+                    <Button onClick={() => { setHtmlTab("show"); setHtmlOpen(true); }}>▶ العرض التفاعلي</Button>
+                    <Button variant="secondary" onClick={() => { setHtmlTab("code"); setHtmlOpen(true); }}>
+                      💻 الكود
+                    </Button>
+                    <Button variant="secondary" onClick={downloadHtml}>
+                      ⬇️ ملف ‎.html
+                    </Button>
+                  </>
+                )}
+                {format !== "html" && (
+                  <Button variant={format === "pptx" ? "primary" : "secondary"} onClick={download} disabled={downloading}>
+                    {downloading ? <Spinner /> : "⬇️"} ملف ‎.pptx
+                  </Button>
+                )}
+                {format !== "both" && (
+                  <Button variant="ghost" size="sm" onClick={() => setFormat("both")}>
+                    + {format === "pptx" ? "كود HTML" : "باوربوينت"}
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -341,6 +378,39 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
               {htmlOpen && (
                 <Dialog title={`▶ ${p.title}`} onClose={() => setHtmlOpen(false)} wide>
                   <div className="space-y-3">
+                    <Segmented
+                      label="العرض أو الكود"
+                      value={htmlTab}
+                      onChange={setHtmlTab}
+                      options={[
+                        { value: "show", label: "▶ العرض" },
+                        { value: "code", label: "💻 الكود" },
+                      ]}
+                    />
+                    {htmlTab === "code" ? (
+                      <div className="space-y-2">
+                        <textarea
+                          readOnly
+                          value={html}
+                          dir="ltr"
+                          aria-label="كود العرض"
+                          className="h-[55dvh] w-full resize-none rounded-xl border border-slate-200 bg-slate-950 p-3 font-mono text-xs leading-relaxed text-slate-100 dark:border-slate-700"
+                          onFocus={(e) => e.currentTarget.select()}
+                        />
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
+                          <span>
+                            ملف HTML واحد ({Math.round(html.length / 1024)} KB). تقدر تعطيه لأي ذكاء اصطناعي وتطلب تعديلات، أو تحفظه باسم ‎عرض.html‎ (UTF-8) وتفتحه بالمتصفح.
+                          </span>
+                          <div className="flex gap-2">
+                            <CopyButton text={html} />
+                            <Button size="sm" onClick={downloadHtml}>
+                              ⬇️ تحميل
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                    <>
                     <iframe
                       title="العرض التفاعلي"
                       srcDoc={html}
@@ -360,6 +430,8 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
                         </Button>
                       </div>
                     </div>
+                    </>
+                    )}
                   </div>
                 </Dialog>
               )}

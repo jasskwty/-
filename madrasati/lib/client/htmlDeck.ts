@@ -45,6 +45,7 @@ ul.pts{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap
 ul.pts li{display:flex;gap:1.2vw;align-items:flex-start;background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:1.6vh 1.8vw}
 ul.pts li::before{content:"";flex:none;width:.7em;height:.7em;margin-top:.55em;border-radius:50%;background:var(--accent)}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:2vw;width:min(1150px,100%)}
+.grid.two{grid-template-columns:repeat(2,minmax(0,1fr));width:min(950px,100%)}@media (max-width:700px){.grid.two{grid-template-columns:1fr}}
 .grid .card{text-align:start}.grid .card b{display:block;color:var(--blue);font:800 clamp(17px,2vw,28px) "Alexandria","Tajawal",sans-serif;margin-bottom:.6vh}
 .steps{display:flex;flex-direction:column;gap:1.4vh;width:min(1000px,100%)}
 .step{display:flex;align-items:center;gap:1.4vw;text-align:start}
@@ -67,7 +68,7 @@ ul.pts li::before{content:"";flex:none;width:.7em;height:.7em;margin-top:.55em;b
 .pan.l .chip{background:var(--navy)}
 @keyframes drop{from{transform:translateY(-40px);opacity:0}}
 .stats{display:flex;flex-wrap:wrap;justify-content:center;gap:2.5vw}
-.stat{min-width:min(240px,40vw)}.stat .v{font:900 clamp(34px,5.5vw,80px) "Alexandria",sans-serif;color:var(--blue);direction:ltr}
+.stats{width:min(1150px,100%)}.stat{flex:1 1 0;min-width:min(180px,40vw)}.stat .v{font:900 clamp(34px,5.5vw,80px) "Alexandria",sans-serif;color:var(--blue);direction:ltr}
 .quote{font:800 clamp(24px,3.6vw,52px)/1.5 "Alexandria","Tajawal",sans-serif;color:var(--navy);max-width:1100px;position:relative;padding:0 3vw}
 .quote::before,.quote::after{color:var(--accent);font-size:1.4em}.quote::before{content:"«"}.quote::after{content:"»"}
 .quiz{width:min(900px,100%);display:flex;flex-direction:column;gap:1.4vh}
@@ -122,7 +123,7 @@ D.slides.forEach(function(x){
   var type=x.type||'bullets',s=slide('',x.notes);badge(s,x.priority);
   s.appendChild(el('h2',null,x.title));
   if(x.subtitle&&type!=='quote'&&type!=='timer')s.appendChild(el('p','sub',x.subtitle));
-  if(type==='cards'){var g=kid(s,el('div','grid'));x.bullets.forEach(function(b){var p=split(b),c=el('div','card f');if(p[0])c.appendChild(el('b',null,p[0]));c.appendChild(el('p',null,p[1]));g.appendChild(c)})}
+  if(type==='cards'){var g=kid(s,el('div','grid'+(x.bullets.length===4?' two':'')));x.bullets.forEach(function(b){var p=split(b),c=el('div','card f');if(p[0])c.appendChild(el('b',null,p[0]));c.appendChild(el('p',null,p[1]));g.appendChild(c)})}
   else if(type==='steps'){var st=kid(s,el('div','steps'));x.bullets.forEach(function(b,i){var r=el('div','step f');add(r,el('span','n',String(i+1)),add(el('div','card'),el('p',null,b)));st.appendChild(r)})}
   else if(type==='compare'){var cs=kid(s,el('div','cols')),R=kid(cs,el('div','col')),L=kid(cs,el('div','col l'));R.appendChild(el('h3',null,x.right_title));L.appendChild(el('h3',null,x.left_title));
     var n=Math.max(x.right_items.length,x.left_items.length);for(var i=0;i<n;i++){if(x.right_items[i])R.appendChild(add(el('div','card f'),el('p',null,x.right_items[i])));if(x.left_items[i])L.appendChild(add(el('div','card f'),el('p',null,x.left_items[i])))}}
