@@ -7,7 +7,7 @@ import { moeCatalog, moePageCount, moePages, type MoeCatalog, type MoeItem } fro
 import { Button, ErrorBox, Input, Loading, Segmented, Select, Spinner, cx } from "./ui";
 
 /** نافذة منبثقة بسيطة */
-export function Dialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Dialog({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
@@ -29,7 +29,10 @@ export function Dialog({ title, onClose, children }: { title: string; onClose: (
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="flex max-h-[90dvh] w-full max-w-xl flex-col rounded-t-3xl bg-white shadow-2xl outline-none sm:rounded-3xl dark:bg-slate-900"
+        className={cx(
+          "flex max-h-[94dvh] w-full flex-col rounded-t-3xl bg-white shadow-2xl outline-none sm:rounded-3xl dark:bg-slate-900",
+          wide ? "max-w-6xl" : "max-w-xl",
+        )}
       >
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3 dark:border-slate-800">
           <h2 className="font-bold">{title}</h2>

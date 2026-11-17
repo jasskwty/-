@@ -22,12 +22,31 @@ export interface FlashcardDeck {
 
 export type Priority = "high" | "medium" | "low";
 
+export const SLIDE_TYPES = ["bullets", "cards", "steps", "compare", "balance", "stats", "quote", "quiz", "timer"] as const;
+export type SlideType = (typeof SLIDE_TYPES)[number];
+
+export interface SlideQuizQuestion {
+  question: string;
+  options: string[];
+  answer_index: number;
+}
+
 export interface Slide {
   title: string;
   bullets: string[];
   notes: string;
   /** أولوية الشريحة في الاختبار (فاضي إذا العرض بدون تحليل اختبارات) */
   priority?: Priority | "";
+  // ===== الشرائح المتنوعة والتفاعلية (العروض القديمة ما فيها هذي الحقول) =====
+  type?: SlideType;
+  subtitle?: string;
+  left_title?: string;
+  left_items?: string[];
+  right_title?: string;
+  right_items?: string[];
+  quiz?: SlideQuizQuestion[];
+  stats?: { value: string; label: string }[];
+  timer_minutes?: number;
 }
 
 /** بند من حصر الدرس في الاختبارات */

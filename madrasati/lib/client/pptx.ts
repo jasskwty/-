@@ -1,4 +1,36 @@
-import type { Presentation } from "@/lib/types";
+import type { Presentation, Slide } from "@/lib/types";
+
+/** يحوّل أي نوع شريحة لنقاط (لملف PowerPoint والمعاينة المختصرة) */
+export function slideBullets(s: Slide): string[] {
+  switch (s.type) {
+    case "compare":
+    case "balance":
+      return [
+        ...(s.right_title ? [`${s.right_title}:`] : []),
+        ...(s.right_items ?? []).map((x) => `  ${x}`),
+        ...(s.left_title ? [`${s.left_title}:`] : []),
+        ...(s.left_items ?? []).map((x) => `  ${x}`),
+      ];
+    case "stats":
+      return (s.stats ?? []).map((x) => `${x.value} — ${x.label}`);
+    case "quiz":
+      return (s.quiz ?? []).map((q, i) => `${i + 1}. ${q.question} (${q.options.join(" / ")})`);
+    case "timer":
+      return [`نشاط لمدة ${s.timer_minutes ?? 5} دقائق${s.subtitle ? `: ${s.subtitle}` : ""}`, ...s.bullets];
+    case "quote":
+      return [s.subtitle || "", ...s.bullets].filter(Boolean);
+    case "steps":
+      return s.bullets.map((b, i) => `${i + 1}. ${b}`);
+    default:
+      return s.bullets;
+  }
+}
+
+/** ملاحظات الشريحة، ومعها إجابات الاختبار إذا موجود */
+export function slideNotes(s: Slide): string {
+  const answers = s.type === "quiz" && s.quiz?.length ? `\nالإجابات: ${s.quiz.map((q, i) => `${i + 1}) ${q.options[q.answer_index]}`).join("  ")}` : "";
+  return (s.notes || "") + answers;
+}
 
 export interface SlideTheme {
   id: string;
@@ -13,6 +45,7 @@ export interface SlideTheme {
 
 // الألوان بدون # (صيغة pptxgenjs)
 export const THEMES: SlideTheme[] = [
+  { id: "royal", name: "كحلي ملكي", bg: "F4F7FF", titleBg: "041E52", titleText: "FFFFFF", heading: "0149AD", text: "0B1220", accent: "3B82F6" },
   { id: "ocean", name: "أزرق كلاسيكي", bg: "FFFFFF", titleBg: "1F5BF0", titleText: "FFFFFF", heading: "1A3AB2", text: "1E293B", accent: "599FFF" },
   { id: "desert", name: "رملي دافئ", bg: "FFF8EE", titleBg: "B45309", titleText: "FFFFFF", heading: "92400E", text: "3F2D1C", accent: "F59E0B" },
   { id: "palm", name: "أخضر طبيعي", bg: "F3FBF6", titleBg: "047857", titleText: "FFFFFF", heading: "065F46", text: "1F2937", accent: "34D399" },
@@ -67,7 +100,7 @@ export async function downloadPptx(
     });
     slide.addShape(pptx.ShapeType.rect, { x: W - 3.4, y: 1.5, w: 2.5, h: 0.07, fill: { color: t.accent } });
     slide.addText(
-      s.bullets.map((b) => ({
+      slideBullets(s).map((b) => ({
         text: b,
         options: { bullet: { characterCode: "25CF" }, breakLine: true, paraSpaceAfter: 10 },
       })),
@@ -75,13 +108,14 @@ export async function downloadPptx(
     );
     if (s.priority === "high" || s.priority === "medium") {
       const high = s.priority === "high";
-      slide.addText(high ? "⭐ مهم للاختبار" : "◆ يجي أحياناً", {
+      slide.addText(high ? "مهم للاختبار" : "يجي أحياناً", {
         ...rtl, x: 0.4, y: 0.3, w: 2.4, h: 0.45, fontSize: 13, bold: true, align: "center", valign: "middle",
         color: high ? "B91C1C" : "92400E", fill: { color: high ? "FEE2E2" : "FEF3C7" }, rectRadius: 0.2, shape: pptx.ShapeType.roundRect,
       });
     }
     slide.addText(`${i + 2}`, { ...rtl, x: 0.4, y: H - 0.7, w: 0.8, h: 0.4, fontSize: 12, color: t.accent, align: "left" });
-    if (s.notes) slide.addNotes(s.notes);
+    const nt = slideNotes(s);
+    if (nt) slide.addNotes(nt);
   });
 
   // ===== شريحة الختام =====

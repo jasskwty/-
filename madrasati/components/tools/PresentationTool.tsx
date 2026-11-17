@@ -5,10 +5,25 @@ import type { ExamFocus, ExamFocusItem, Presentation } from "@/lib/types";
 import { ExamFocusPanel, PriorityBadge, SECONDARY_GRADES } from "../ExamFocusPanel";
 import { postJson } from "@/lib/client/stream";
 import { useHistory, useStored, type HistoryItem } from "@/lib/client/storage";
-import { downloadPptx, THEMES, themeById, type SlideTheme } from "@/lib/client/pptx";
+import { downloadPptx, slideBullets, THEMES, themeById, type SlideTheme } from "@/lib/client/pptx";
+import { buildHtmlDeck } from "@/lib/client/htmlDeck";
+import { toPayload, type PickedImage } from "@/lib/client/image";
+import { ImageInput } from "../ImageInput";
+import { Dialog } from "../LibraryPicker";
 import { HistoryPanel } from "../HistoryPanel";
 import { MoreExplainer } from "../ResultView";
-import { Button, Card, EmptyHint, ErrorBox, Field, Input, Loading, Spinner, cx } from "../ui";
+import { Button, Card, EmptyHint, ErrorBox, Field, Input, Loading, Segmented, Spinner, TextArea, Toggle, cx } from "../ui";
+
+const TYPE_LABEL: Record<string, string> = {
+  cards: "بطاقات",
+  steps: "خطوات",
+  compare: "مقارنة",
+  balance: "ميزان تفاعلي",
+  stats: "أرقام",
+  quote: "فكرة محورية",
+  quiz: "اختبار تفاعلي",
+  timer: "مؤقت نشاط",
+};
 
 interface DeckState {
   topic: string;
@@ -69,7 +84,7 @@ function ContentSlide({ s, n, theme }: { s: Presentation["slides"][number]; n: n
         </div>
         <div className="mt-[1.5%] h-[1%] w-[19%]" style={{ background: hex(theme.accent) }} />
         <ul className="mt-[3.5%] space-y-[1.2cqw]" style={{ fontSize: "2.3cqw", color: hex(theme.text) }}>
-          {s.bullets.map((b, i) => (
+          {slideBullets(s).map((b, i) => (
             <li key={i} className="flex gap-[1.2cqw]">
               <span style={{ color: hex(theme.accent) }}>●</span>
               <span>{b}</span>
@@ -80,6 +95,11 @@ function ContentSlide({ s, n, theme }: { s: Presentation["slides"][number]; n: n
       <div className="absolute bottom-[4%] left-[3%]" style={{ fontSize: "1.4cqw", color: hex(theme.accent) }}>
         {n}
       </div>
+      {s.type && TYPE_LABEL[s.type] && (
+        <div className="absolute right-[6%] bottom-[4%] rounded-full px-[1cqw] py-[0.3cqw] font-bold" style={{ fontSize: "1.4cqw", background: hex(theme.accent), color: "#fff" }}>
+          {TYPE_LABEL[s.type]}
+        </div>
+      )}
     </SlideFrame>
   );
 }
@@ -90,6 +110,12 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
   const history = useHistory<DeckState>(teacher ? "teacher:presentation" : "presentation");
   const [topic, setTopic] = useState("");
   const [focus, setFocus] = useState<FocusValue | null>(null);
+  const [content, setContent] = useState("");
+  const [files, setFiles] = useState<PickedImage[]>([]);
+  const [quizOn, setQuizOn] = useStored("presentation:quiz", true);
+  const [timer, setTimer] = useStored("presentation:timer", 0);
+  const [varied, setVaried] = useStored("presentation:varied", true);
+  const [htmlOpen, setHtmlOpen] = useState(false);
   const secondary = SECONDARY_GRADES.includes(ctx.grade);
   const [count, setCount] = useState(6);
   const [themeId, setThemeId] = useStored("presentation:theme", THEMES[0].id);
@@ -115,7 +141,18 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
       const useFocus = secondary && focus?.items.length ? focus : null;
       const presentation = await postJson<Presentation>(
         "/api/json",
-        { ...ctx, tool: "presentation", topic, count, focus: useFocus?.items },
+        {
+          ...ctx,
+          tool: "presentation",
+          topic,
+          count,
+          focus: useFocus?.items,
+          content,
+          images: toPayload(files),
+          quiz: quizOn,
+          timer,
+          varied,
+        },
         ac.signal,
       );
       if (!presentation.slides?.length) throw new Error("ما طلعت شرائح. جرّب موضوع ثاني.");
@@ -156,9 +193,30 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
 
   const asText = p
     ? `# ${p.title}\n${p.subtitle}\n\n${p.slides
-        .map((s, i) => `## ${i + 1}. ${s.title}\n${s.bullets.map((b) => `- ${b}`).join("\n")}\n\n> ملاحظات: ${s.notes}`)
+        .map((s, i) => `## ${i + 1}. ${s.title}\n${slideBullets(s).map((b) => `- ${b}`).join("\n")}\n\n> ملاحظات: ${s.notes}`)
         .join("\n\n")}`
     : "";
+
+  // العرض التفاعلي (ملف HTML واحد)
+  const html = p ? buildHtmlDeck(p, { theme, byline: studentName.trim() ? `${byline}: ${studentName.trim()}` : "", meta, name: studentName.trim() }) : "";
+  const safeName = (p?.title ?? "عرض").replace(/[\\/:*?"<>|]+/g, "").trim().slice(0, 60) || "عرض";
+  function downloadHtml() {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+    a.download = `${safeName}.html`;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      URL.revokeObjectURL(a.href);
+      a.remove();
+    }, 2000);
+  }
+  function openHtmlTab() {
+    const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+    window.open(url, "_blank", "noopener");
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
 
   return (
     <div>
@@ -205,6 +263,35 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
               ))}
             </div>
           </div>
+          <details className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
+            <summary className="cursor-pointer font-bold">📄 المحتوى (اختياري): الصق الدرس أو أضف صفحات الكتاب</summary>
+            <div className="mt-3 space-y-2">
+              <TextArea rows={4} value={content} onChange={(e) => setContent(e.target.value)} placeholder="الصق المحتوى أو النقاط هنا…" maxLength={15000} aria-label="محتوى العرض" />
+              <ImageInput images={files} onChange={setFiles} allowPdf />
+              <p className="text-xs text-slate-500">إذا أضفت محتوى، المساعد يلتزم فيه بس، وما يضيف معلومات أو أرقام من عنده.</p>
+            </div>
+          </details>
+          <div className="space-y-3 rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
+            <div className="font-bold">✨ الشرائح التفاعلية (في العرض التفاعلي)</div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-6">
+              <Toggle checked={quizOn} onChange={setQuizOn} label="اختبار سريع" hint="٣ أسئلة: الصح بالأخضر والخطأ بالأحمر" />
+              <Toggle checked={varied} onChange={setVaried} label="شرائح متنوعة" hint="بطاقات، خطوات، مقارنة، ميزان، أرقام…" />
+              <div>
+                <span className="mb-1 block text-sm font-bold">مؤقت نشاط</span>
+                <Segmented
+                  label="مؤقت نشاط"
+                  value={timer}
+                  onChange={setTimer}
+                  options={[
+                    { value: 0, label: "بدون" },
+                    { value: 5, label: "٥ د" },
+                    { value: 10, label: "١٠ د" },
+                    { value: 15, label: "١٥ د" },
+                  ]}
+                />
+              </div>
+            </div>
+          </div>
           {secondary && <ExamFocusPanel ctx={ctx} topic={topic} value={focus} onChange={setFocus} />}
           <Button type="submit" disabled={!topic.trim() || loading} className="w-full sm:w-auto">
             🎞️ {secondary && focus?.items.length ? "جهّز العرض حسب أولويات الاختبار" : "جهّز العرض"}
@@ -216,16 +303,22 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
         {loading && <Loading text="جاري تجهيز الشرائح…" />}
         {error && <ErrorBox message={error} onRetry={state ? download : generate} />}
         {!p && !loading && !error && (
-          <EmptyHint icon="🎞️" title="برزنتيشن جاهز بدقايق" text="حدد الموضوع وعدد الشرائح والثيم واسمك، وبعدها تقدر تحمّل ملف PowerPoint فيه ملاحظات المتحدث." />
+          <EmptyHint icon="🎞️" title="برزنتيشن جاهز بدقايق" text="حدد الموضوع وعدد الشرائح والثيم واسمك. يطلع لك عرض تفاعلي (ملف HTML فيه حركات واختبار ومؤقت)، وملف PowerPoint فيه ملاحظات المتحدث." />
         )}
 
         {p && (
           <Card>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <span className="font-bold">معاينة الشرائح</span>
-              <Button onClick={download} disabled={downloading}>
-                {downloading ? <Spinner /> : "⬇️"} تحميل ملف ‎.pptx
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => setHtmlOpen(true)}>▶ العرض التفاعلي</Button>
+                <Button variant="secondary" onClick={downloadHtml}>
+                  ⬇️ ملف ‎.html
+                </Button>
+                <Button variant="secondary" onClick={download} disabled={downloading}>
+                  {downloading ? <Spinner /> : "⬇️"} ملف ‎.pptx
+                </Button>
+              </div>
             </div>
 
             <div className="mx-auto max-w-3xl">
@@ -245,6 +338,31 @@ export function PresentationTool({ ctx }: { ctx: StudyContext }) {
                   التالية ←
                 </Button>
               </div>
+              {htmlOpen && (
+                <Dialog title={`▶ ${p.title}`} onClose={() => setHtmlOpen(false)} wide>
+                  <div className="space-y-3">
+                    <iframe
+                      title="العرض التفاعلي"
+                      srcDoc={html}
+                      sandbox="allow-scripts"
+                      allow="fullscreen"
+                      allowFullScreen
+                      className="aspect-video w-full rounded-xl border border-slate-200 bg-white dark:border-slate-700"
+                    />
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
+                      <span>اضغط داخل العرض: ← أو مسافة للتالي · N ملاحظات · O كل الشرائح · F ملء الشاشة</span>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="secondary" onClick={openHtmlTab}>
+                          افتح في تبويب جديد ↗
+                        </Button>
+                        <Button size="sm" onClick={downloadHtml}>
+                          ⬇️ تحميل
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </Dialog>
+              )}
               {current > 0 && p.slides[current - 1].notes && (
                 <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-800/60">
                   <span className="font-bold">🎤 {teacher ? "ملاحظات للمعلم" : "ملاحظات المتحدث"}: </span>

@@ -1,6 +1,6 @@
 import { generateJson, jsonError, UserFacingError } from "@/lib/server/claude";
 import { readBody, readContext, readImages, readInt, readText, systemPrompt, TASKS, userContent } from "@/lib/server/prompts";
-import type { ExamFocus, FlashcardDeck, Presentation, Quiz } from "@/lib/types";
+import { SLIDE_TYPES, type ExamFocus, type FlashcardDeck, type Presentation, type Quiz, type Slide, type SlideType } from "@/lib/types";
 import { PDF_TYPE, type ImageData } from "@/lib/constants";
 import { MAX_PAGES, moePages } from "@/lib/server/sources/moe";
 
@@ -36,8 +36,54 @@ const CARDS_SCHEMA = obj({
 const SLIDES_SCHEMA = obj({
   title: str,
   subtitle: str,
-  slides: { type: "array", items: obj({ title: str, bullets: { type: "array", items: str }, notes: str, priority: str }) },
+  slides: {
+    type: "array",
+    items: obj({
+      type: str,
+      title: str,
+      subtitle: str,
+      bullets: { type: "array", items: str },
+      notes: str,
+      priority: str,
+      right_title: str,
+      right_items: { type: "array", items: str },
+      left_title: str,
+      left_items: { type: "array", items: str },
+      quiz: { type: "array", items: obj({ question: str, options: { type: "array", items: str }, answer_index: { type: "integer" } }) },
+      stats: { type: "array", items: obj({ value: str, label: str }) },
+      timer_minutes: { type: "integer" },
+    }),
+  },
 });
+
+/** ينظف شريحة وصلت من المساعد ويتأكد إنها سليمة لنوعها */
+function cleanSlide(sl: Slide, focus: boolean): Slide {
+  const type: SlideType = SLIDE_TYPES.includes(sl.type as SlideType) ? (sl.type as SlideType) : "bullets";
+  const arr = (a: unknown) => (Array.isArray(a) ? a.filter((x): x is string => typeof x === "string" && !!x.trim()) : []);
+  const quiz = (sl.quiz ?? [])
+    .filter((q) => q.question?.trim() && arr(q.options).length >= 2)
+    .map((q) => ({ question: q.question, options: arr(q.options).slice(0, 5), answer_index: Math.min(Math.max(0, q.answer_index | 0), arr(q.options).length - 1) }));
+  const out: Slide = {
+    type,
+    title: sl.title,
+    subtitle: sl.subtitle ?? "",
+    bullets: arr(sl.bullets),
+    notes: sl.notes ?? "",
+    priority: focus && PRIORITIES.includes(sl.priority as never) ? sl.priority : "",
+    right_title: sl.right_title ?? "",
+    right_items: arr(sl.right_items),
+    left_title: sl.left_title ?? "",
+    left_items: arr(sl.left_items),
+    quiz,
+    stats: (sl.stats ?? []).filter((x) => x.value?.trim()),
+    timer_minutes: Math.min(60, Math.max(0, (sl.timer_minutes ?? 0) | 0)),
+  };
+  // إذا النوع ناقص بياناته، نرجعه نقاط عادية
+  if ((type === "quiz" && !quiz.length) || (type === "stats" && !out.stats!.length) || ((type === "compare" || type === "balance") && !out.right_items!.length && !out.left_items!.length))
+    out.type = "bullets";
+  if (type === "timer" && !out.timer_minutes) out.timer_minutes = 5;
+  return out;
+}
 
 const FOCUS_SCHEMA = obj({
   lesson: str,
@@ -192,22 +238,27 @@ export async function POST(req: Request) {
       case "presentation": {
         const count = readInt(body.count, 3, 15, 6);
         const focus = focusText(body.focus);
+        const content = readText(body.content, "المحتوى", { required: false, max: 15000 });
+        const images = readImages(body.images);
+        const quizOn = body.quiz !== false;
+        const timer = readInt(body.timer, 0, 60, 0);
+        const extras = [
+          quizOn && "اجعل وحدة من شرائح المحتوى من نوع quiz (٣ أسئلة) قرب النهاية.",
+          timer > 0 && `اجعل وحدة من شرائح المحتوى من نوع timer لنشاط مدته ${timer} دقائق مناسب للدرس.`,
+          body.varied !== false ? "نوّع أنواع الشرائح حسب المحتوى (مو كلها نقاط)." : "استخدم bullets لكل الشرائح ما عدا الشرائح التفاعلية المطلوبة.",
+        ].filter(Boolean);
+        const text = `موضوع العرض: ${topic}\nعدد شرائح المحتوى: ${count} بالضبط (بدون شريحة العنوان)\n${extras.join("\n")}${
+          content ? `\n\nالمحتوى (استخدمه فقط):\n${content}` : ""
+        }${images.length ? "\n\nالمرفقات: محتوى من المستخدم (استخدمه فقط)." : ""}${
+          focus ? `\n\nأولويات الاختبار (من تحليل الاختبارات والمراجعات، واعتمدها المستخدم):\n${focus}` : ""
+        }`;
         const presentation = await generateJson<Presentation>({
           system: systemPrompt(ctx, ctx.role === "teacher" ? TASKS.teacherPresentation : TASKS.presentation),
-          messages: [
-            {
-              role: "user",
-              content: `موضوع العرض: ${topic}\nعدد شرائح المحتوى: ${count} بالضبط (بدون شريحة العنوان)${
-                focus ? `\n\nأولويات الاختبار (من تحليل الاختبارات والمراجعات، واعتمدها المستخدم):\n${focus}` : ""
-              }`,
-            },
-          ],
+          messages: [{ role: "user", content: images.length ? userContent(text, images) : text }],
           schema: SLIDES_SCHEMA,
+          maxTokens: 20000,
         });
-        presentation.slides = presentation.slides.map((sl) => ({
-          ...sl,
-          priority: focus && PRIORITIES.includes(sl.priority as never) ? sl.priority : "",
-        }));
+        presentation.slides = presentation.slides.map((sl) => cleanSlide(sl, !!focus));
         return Response.json(presentation);
       }
       default:
