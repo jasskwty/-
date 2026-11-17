@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Tajawal } from "next/font/google";
+import { Alexandria, Tajawal } from "next/font/google";
 import "katex/dist/katex.min.css";
 import "./globals.css";
 
@@ -7,6 +7,13 @@ const tajawal = Tajawal({
   subsets: ["arabic", "latin"],
   weight: ["400", "500", "700", "800"],
   variable: "--font-tajawal",
+  display: "swap",
+});
+
+const alexandria = Alexandria({
+  subsets: ["arabic", "latin"],
+  weight: ["600", "700", "800"],
+  variable: "--font-alexandria",
   display: "swap",
 });
 
@@ -20,8 +27,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
-    { media: "(prefers-color-scheme: dark)", color: "#020617" },
+    { media: "(prefers-color-scheme: light)", color: "#f6f7fc" },
+    { media: "(prefers-color-scheme: dark)", color: "#070b19" },
   ],
 };
 
@@ -30,7 +37,7 @@ const themeScript = `try{var t=localStorage.getItem("madrasati:theme");t=t?JSON.
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ar" dir="rtl" className={tajawal.variable} suppressHydrationWarning>
+    <html lang="ar" dir="rtl" className={`${tajawal.variable} ${alexandria.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

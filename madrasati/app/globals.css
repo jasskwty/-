@@ -4,16 +4,17 @@
 
 @theme {
   --font-sans: var(--font-tajawal), ui-sans-serif, system-ui, sans-serif;
-  --color-brand-50: #eef6ff;
-  --color-brand-100: #d9eaff;
-  --color-brand-200: #bcdaff;
-  --color-brand-300: #8ec2ff;
-  --color-brand-400: #599fff;
-  --color-brand-500: #3479fb;
-  --color-brand-600: #1f5bf0;
-  --color-brand-700: #1846dc;
-  --color-brand-800: #1a3ab2;
-  --color-brand-900: #1b368c;
+  --font-display: var(--font-alexandria), var(--font-tajawal), ui-sans-serif, system-ui, sans-serif;
+  --color-brand-50: #f0efff;
+  --color-brand-100: #e3e1ff;
+  --color-brand-200: #cac6ff;
+  --color-brand-300: #a9a2ff;
+  --color-brand-400: #8b7cfb;
+  --color-brand-500: #7460f4;
+  --color-brand-600: #5d45e6;
+  --color-brand-700: #4d37c9;
+  --color-brand-800: #3f2fa2;
+  --color-brand-900: #352b80;
 }
 
 :root {
@@ -25,7 +26,53 @@
 
 html,
 body {
-  @apply bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100;
+  @apply text-slate-800 dark:text-slate-100;
+  background-color: #f6f7fc;
+}
+.dark body,
+html.dark {
+  background-color: #070b19;
+}
+/* خلفية بهالات لونية وشبكة ناعمة */
+body {
+  background-image:
+    radial-gradient(900px 520px at 100% -8%, rgb(116 96 244 / 0.16), transparent 62%),
+    radial-gradient(760px 520px at -10% 108%, rgb(56 189 248 / 0.13), transparent 60%);
+  background-attachment: fixed;
+}
+.dark body {
+  background-image:
+    radial-gradient(1000px 560px at 100% -10%, rgb(116 96 244 / 0.28), transparent 62%),
+    radial-gradient(820px 560px at -10% 110%, rgb(56 189 248 / 0.18), transparent 60%);
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: linear-gradient(rgb(93 69 230 / 0.05) 1px, transparent 1px), linear-gradient(90deg, rgb(93 69 230 / 0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at 50% 20%, #000 30%, transparent 75%);
+}
+.dark body::before {
+  background-image: linear-gradient(rgb(255 255 255 / 0.04) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255 / 0.04) 1px, transparent 1px);
+}
+.text-gradient {
+  background: linear-gradient(90deg, var(--color-brand-600), #c026d3 55%, #0ea5e9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.dark .text-gradient {
+  background: linear-gradient(90deg, #a9a2ff, #f0abfc 55%, #7dd3fc);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.prose-ar h1,
+.prose-ar h2,
+.prose-ar h3 {
+  font-family: var(--font-display);
 }
 
 body {

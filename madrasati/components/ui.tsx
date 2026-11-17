@@ -12,7 +12,7 @@ export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Bool
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 const variants: Record<Variant, string> = {
   primary:
-    "bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800 shadow-sm shadow-brand-600/20 disabled:bg-slate-300 disabled:shadow-none dark:disabled:bg-slate-700",
+    "bg-linear-to-l from-brand-600 via-brand-500 to-fuchsia-500 text-white shadow-lg shadow-brand-600/25 hover:brightness-110 active:brightness-95 disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:shadow-none dark:disabled:from-slate-700 dark:disabled:via-slate-700 dark:disabled:to-slate-700",
   secondary:
     "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 dark:hover:bg-slate-700 disabled:opacity-50",
   ghost: "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 disabled:opacity-50",
@@ -45,7 +45,7 @@ export function Card({ className, children }: { className?: string; children: Re
   return (
     <div
       className={cx(
-        "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 dark:border-slate-800 dark:bg-slate-900",
+        "rounded-3xl border border-slate-200/70 bg-white/85 p-4 shadow-[0_10px_40px_-12px_rgb(77_55_201/0.18)] backdrop-blur-sm sm:p-6 dark:border-white/10 dark:bg-slate-900/60 dark:shadow-[0_10px_40px_-12px_rgb(0_0_0/0.6)]",
         className,
       )}
     >
@@ -180,7 +180,7 @@ export function Segmented<T extends string | number>({
           className={cx(
             "rounded-lg px-3 py-1.5 text-sm font-bold transition-colors",
             value === o.value
-              ? "bg-white text-brand-700 shadow-sm dark:bg-slate-900 dark:text-brand-300"
+              ? "bg-white text-brand-700 shadow-sm ring-1 ring-brand-200 dark:bg-slate-900 dark:text-brand-200 dark:ring-brand-800"
               : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
           )}
         >

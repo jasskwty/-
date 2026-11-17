@@ -58,6 +58,31 @@ const TEACHER_TABS = [
 
 const ALL_TABS = [...STUDENT_TABS, ...TEACHER_TABS];
 
+const TAB_DESC: Record<string, string> = {
+  chat: "اسأل أي سؤال في مادتك، وارفع صورة من الكتاب أو الواجب",
+  explain: "شرح خطوة بخطوة مع أمثلة محلولة وأسئلة تدريب",
+  solve: "اكتب السؤال أو صوّره، ويطلع لك الحل بالخطوات",
+  quiz: "اختبر نفسك وشوف تصحيحك على طول",
+  flashcards: "بطاقات تقلبها للحفظ السريع",
+  summarize: "ملخص بنقاط وتعاريف وقوانين من أي نص أو صورة",
+  essay: "تصحيح تعبيرك مع درجة من ١٠ ونسخة محسّنة",
+  presentation: "عرض جاهز: باوربوينت أو صفحة تفاعلية",
+  schedule: "جدول مذاكرة يومي حسب مواعيد اختباراتك",
+  library: "كتب الوزارة وملفات مدرستي حسب صفك ومادتك",
+  "t-chat": "أفكار للشرح والأنشطة وإدارة الصف",
+  "t-library": "دليل المعلم، وخطط التوزيع، وكتب الطالب، والمراجعات",
+  "t-lesson": "تحضير كامل بسير الحصة بالدقائق، من صفحات الكتاب",
+  "t-diff": "أنشطة متمايزة، وألعاب، وتجارب، ووسائل",
+  "t-simplify": "نفس المحتوى بعدة مستويات قراءة",
+  "t-presentation": "عرض للحصة: باوربوينت أو صفحة تفاعلية",
+  "t-worksheet": "أوراق عمل، واختبارات، وبنك أسئلة بمستويات التفكير",
+  "t-grade": "تصحيح من النص أو صورة الورقة، مع ملاحظة للطالب",
+  "t-rubric": "معايير واضحة بمستويات أداء",
+  "t-tracker": "الفصول والدرجات والتحليل والمتابعات، وتصوير الكشف",
+  "t-scaffold": "سقالات تعليمية وتكييفات حسب الاحتياج",
+  "t-comments": "رسائل أولياء الأمور والتقارير الدورية",
+};
+
 // مفاتيح سجلات أدوات المعلم (لزر حذف بيانات المعلم)
 const TEACHER_TOOL_KEYS = [
   "lessonPlan", "worksheet", "grade", "rubric", "differentiate", "comments",
@@ -135,22 +160,22 @@ export default function Home() {
   return (
     <AppProvider ctx={teacher ? teacherCtx : ctx} goToTab={goToTab}>
     <div className="min-h-dvh">
-      <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/85 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/85">
+      <header className="sticky top-0 z-20 border-b border-white/60 bg-white/70 shadow-[0_1px_0_rgb(93_69_230/0.06)] backdrop-blur-xl dark:border-white/5 dark:bg-slate-950/60">
         <div className="mx-auto max-w-5xl px-4">
           <div className="flex items-center justify-between gap-3 pt-3">
             <div className="flex items-center gap-2.5">
-              <span className="flex size-10 items-center justify-center rounded-xl bg-brand-600 text-xl text-white shadow-sm shadow-brand-600/30" aria-hidden>
+              <span className="flex size-11 items-center justify-center rounded-2xl bg-linear-to-br from-brand-500 via-fuchsia-500 to-sky-400 text-xl text-white shadow-lg shadow-brand-600/30" aria-hidden>
                 🎓
               </span>
               <div>
-                <h1 className="text-lg leading-tight font-extrabold sm:text-xl">مساعدي المدرسي</h1>
-                <p className="hidden text-xs text-slate-500 sm:block dark:text-slate-400">
+                <h1 className="text-gradient font-display text-lg leading-tight font-extrabold whitespace-nowrap sm:text-2xl">مساعدي المدرسي</h1>
+                <p className="mt-1 hidden text-xs text-slate-500 sm:block dark:text-slate-400">
                   {teacher ? "مساعدك في التحضير والتدريس والتقويم" : "رفيقك في المذاكرة من السادس إلى الثاني عشر"}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <div role="group" aria-label="الوضع" className="flex rounded-xl bg-slate-100 p-1 text-sm font-bold dark:bg-slate-800">
+              <div role="group" aria-label="الوضع" className="flex rounded-2xl bg-slate-100/80 p-1 text-sm font-bold ring-1 ring-slate-200/70 dark:bg-white/5 dark:ring-white/10">
                 {(
                   [
                     { value: "student", icon: "🎒", label: "طالب" },
@@ -163,9 +188,9 @@ export default function Home() {
                     aria-pressed={role === r.value}
                     onClick={() => setRole(r.value)}
                     className={cx(
-                      "rounded-lg px-2.5 py-1 transition-colors",
+                      "rounded-xl px-3 py-1 transition-all",
                       role === r.value
-                        ? "bg-white text-brand-700 shadow-sm dark:bg-slate-900 dark:text-brand-300"
+                        ? "bg-linear-to-l from-brand-600 to-fuchsia-500 text-white shadow-md shadow-brand-600/30"
                         : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white",
                     )}
                   >
@@ -222,10 +247,10 @@ export default function Home() {
                 aria-selected={tab === t.id}
                 onClick={() => setTab(t.id)}
                 className={cx(
-                  "flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold whitespace-nowrap transition-colors",
+                  "flex shrink-0 items-center gap-1.5 rounded-2xl px-3.5 py-2 text-sm font-bold whitespace-nowrap transition-all",
                   tab === t.id
-                    ? "bg-brand-600 text-white shadow-sm"
-                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800",
+                    ? "bg-linear-to-l from-brand-600 via-brand-500 to-fuchsia-500 text-white shadow-lg shadow-brand-600/30"
+                    : "text-slate-600 hover:bg-white hover:shadow-sm hover:ring-1 hover:ring-slate-200 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:ring-white/10",
                 )}
               >
                 <span aria-hidden>{t.icon}</span>
@@ -237,6 +262,20 @@ export default function Home() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-5 sm:py-8">
+        {(() => {
+          const cur = TABS.find((t) => t.id === tab);
+          return cur ? (
+            <div className="mb-5 flex items-center gap-4">
+              <span className="flex size-14 shrink-0 items-center justify-center rounded-3xl bg-white/80 text-3xl shadow-[0_10px_30px_-10px_rgb(93_69_230/0.45)] ring-1 ring-brand-100 dark:bg-white/5 dark:ring-white/10" aria-hidden>
+                {cur.icon}
+              </span>
+              <div className="min-w-0">
+                <h2 className="font-display text-2xl leading-tight font-extrabold text-slate-900 sm:text-3xl dark:text-white">{cur.label}</h2>
+                <p className="mt-1.5 text-sm leading-relaxed text-slate-500 dark:text-slate-400">{TAB_DESC[cur.id]}</p>
+              </div>
+            </div>
+          ) : null;
+        })()}
         {teacher && (
           <div className="mb-5 grid gap-2 md:grid-cols-2 md:items-start">
             <ReferencePanel ctx={{ ...ctx, role: "teacher" }} value={reference} onChange={setReference} />
