@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { subjectLabel, type StudyContext } from "@/lib/constants";
-import { fileToImage, toPayload, type PickedImage } from "@/lib/client/image";
+import { fileToAttachment, toPayload, type PickedImage } from "@/lib/client/image";
 import { streamPost } from "@/lib/client/stream";
 import { useStored } from "@/lib/client/storage";
 import { ImageInput } from "../ImageInput";
@@ -14,6 +14,7 @@ interface ChatMessage {
   role: "user" | "assistant";
   text: string;
   images?: string[]; // معاينات (ما تنحفظ)
+  fileNames?: string[];
   hadImages?: boolean;
 }
 interface Conversation {
@@ -84,7 +85,7 @@ export function ChatTool({ ctx }: { ctx: StudyContext }) {
   async function send(textArg?: string, history = messages) {
     const text = (textArg ?? input).trim();
     if ((!text && !images.length) || streaming) return;
-    const userMsg: ChatMessage = { role: "user", text, images: images.map((i) => i.preview) };
+    const userMsg: ChatMessage = { role: "user", text, images: images.map((i) => i.preview), fileNames: images.map((i) => i.name ?? "") };
     const payloadImages = toPayload(images);
     const base = [...history, userMsg];
     setMessages([...base, { role: "assistant", text: "" }]);
@@ -196,13 +197,19 @@ export function ChatTool({ ctx }: { ctx: StudyContext }) {
               >
                 {m.images && m.images.length > 0 && (
                   <div className="mb-2 flex flex-wrap gap-2">
-                    {m.images.map((src, j) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img key={j} src={src} alt="صورة مرفقة" className="max-h-40 rounded-lg" />
-                    ))}
+                    {m.images.map((src, j) =>
+                      src ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={j} src={src} alt="صورة مرفقة" className="max-h-40 rounded-lg" />
+                      ) : (
+                        <span key={j} className="rounded-lg bg-white/20 px-2 py-1 text-sm">
+                          📄 {m.fileNames?.[j] ?? "PDF"}
+                        </span>
+                      ),
+                    )}
                   </div>
                 )}
-                {!m.images?.length && m.hadImages && <div className="mb-1 text-xs opacity-80">🖼️ صورة مرفقة</div>}
+                {!m.images?.length && m.hadImages && <div className="mb-1 text-xs opacity-80">📎 مرفق</div>}
                 {m.role === "user" ? (
                   <p className="whitespace-pre-wrap">{m.text}</p>
                 ) : m.text ? (
@@ -236,15 +243,15 @@ export function ChatTool({ ctx }: { ctx: StudyContext }) {
             void send();
           }}
           onPaste={(e) => {
-            const files = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/"));
+            const files = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/") || f.type === "application/pdf");
             if (!files.length) return;
             e.preventDefault();
-            Promise.all(files.slice(0, 4 - images.length).map(fileToImage))
+            Promise.all(files.slice(0, 4 - images.length).map((f) => fileToAttachment(f, true)))
               .then((imgs) => setImages((prev) => [...prev, ...imgs]))
               .catch((err) => setError((err as Error).message));
           }}
         >
-          <ImageInput images={images} onChange={setImages} compact />
+          <ImageInput images={images} onChange={setImages} compact allowPdf />
           <div className="flex items-end gap-2">
             <textarea
               ref={taRef}

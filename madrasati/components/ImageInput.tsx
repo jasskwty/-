@@ -2,6 +2,7 @@
 import { useRef, useState } from "react";
 import { fileToAttachment, type PickedImage } from "@/lib/client/image";
 import { Button } from "./ui";
+import { InboxChips, LibraryPickerDialog } from "./LibraryPicker";
 
 export function ImageInput({
   images,
@@ -22,6 +23,12 @@ export function ImageInput({
   const camRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [picker, setPicker] = useState(false);
+  const full = images.length >= max;
+  const addOne = (img: PickedImage) => {
+    if (images.length >= max) return setError(`تقدر ترفع ${max} مرفقات كحد أقصى.`);
+    onChange([...images.filter((i) => i.id !== img.id), img]);
+  };
 
   async function addFiles(files: FileList | File[] | null) {
     if (!files?.length) return;
@@ -90,7 +97,12 @@ export function ImageInput({
             📷 صوّر
           </Button>
         )}
-        {busy && <span className="text-sm text-slate-500">جاري تجهيز الصورة…</span>}
+        {allowPdf && (
+          <Button variant="secondary" size="sm" onClick={() => setPicker(true)} disabled={full} aria-label="صفحات من مكتبة الوزارة">
+            📚 {compact ? "" : "من كتب الوزارة"}
+          </Button>
+        )}
+        {busy && <span className="text-sm text-slate-500">جاري تجهيز الملف…</span>}
       </div>
       {images.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-2">
@@ -127,7 +139,9 @@ export function ImageInput({
           ))}
         </div>
       )}
+      {allowPdf && !full && <InboxChips onTake={addOne} />}
       {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {picker && <LibraryPickerDialog onClose={() => setPicker(false)} onAdd={addOne} />}
     </div>
   );
 }

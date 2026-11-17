@@ -227,7 +227,7 @@ export function GradeTool({ ctx }: { ctx: StudyContext }) {
             <Field label="إجابة الطالب">
               <TextArea rows={5} value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="الصق إجابة الطالب هنا، أو ارفع صورة الورقة…" maxLength={12000} />
             </Field>
-            <ImageInput images={images} onChange={setImages} />
+            <ImageInput images={images} onChange={setImages} allowPdf />
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <Field label="الدرجة الكلية" className="sm:w-40">
                 <Input type="number" inputMode="numeric" min={1} max={100} value={total} onChange={(e) => setTotal(e.target.value)} />

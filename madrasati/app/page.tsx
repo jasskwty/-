@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { GRADES, SUBJECTS, type GradeId, type Role, type SubjectId } from "@/lib/constants";
 import { useStored } from "@/lib/client/storage";
 import { cx } from "@/components/ui";
@@ -20,6 +20,8 @@ import {
 } from "@/components/tools/TeacherTools";
 import { TrackerTool } from "@/components/tools/TrackerTool";
 import { PrivacyPanel, ReferencePanel } from "@/components/TeacherPanels";
+import { LibraryTool } from "@/components/tools/LibraryTool";
+import { AppProvider } from "@/lib/client/appContext";
 
 const STUDENT_TABS = [
   { id: "chat", label: "اسأل المعلم", icon: "💬", Comp: ChatTool },
@@ -31,11 +33,13 @@ const STUDENT_TABS = [
   { id: "essay", label: "صحّح تعبيري", icon: "🖊️", Comp: EssayTool },
   { id: "presentation", label: "برزنتيشن", icon: "🎞️", Comp: PresentationTool },
   { id: "schedule", label: "جدول مذاكرة", icon: "🗓️", Comp: ScheduleTool },
+  { id: "library", label: "المكتبة", icon: "📚", Comp: LibraryTool },
 ] as const;
 
 // أدوات المعلم (معرّفاتها مختلفة عشان كل أداة تحتفظ بحالتها الخاصة)
 const TEACHER_TABS = [
   { id: "t-chat", label: "مساعد تربوي", icon: "💬", Comp: ChatTool },
+  { id: "t-library", label: "مصادر الوزارة", icon: "📚", Comp: LibraryTool },
   // ١. التحضير وتصميم المحتوى
   { id: "t-lesson", label: "تحضير درس", icon: "📋", Comp: LessonPlanTool },
   { id: "t-diff", label: "أنشطة وتجارب", icon: "🧩", Comp: DifferentiateTool },
@@ -110,8 +114,26 @@ export default function Home() {
 
   const [reference, setReference] = useStored<string>(`teacher:reference:${grade}:${subject}`, "");
   const ctx = { grade, subject, role };
+  const teacherCtx = { ...ctx, role: "teacher" as const, reference };
+  const goToTab = useCallback(
+    (id: string) => {
+      const target = ALL_TABS.find((t) => t.id === id);
+      if (!target) return;
+      if (id.startsWith("t-")) {
+        setRole("teacher");
+        setTeacherTab(target.id);
+      } else {
+        setRole("student");
+        setStudentTab(target.id);
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   return (
+    <AppProvider ctx={teacher ? teacherCtx : ctx} goToTab={goToTab}>
     <div className="min-h-dvh">
       <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/85 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/85">
         <div className="mx-auto max-w-5xl px-4">
@@ -238,5 +260,6 @@ export default function Home() {
           : "المساعد ممكن يغلط أحياناً، راجع المعلومات المهمة مع معلمك وكتابك المدرسي."}
       </footer>
     </div>
+    </AppProvider>
   );
 }

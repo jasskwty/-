@@ -88,7 +88,7 @@ function TextImageForm({
           maxLength={20000}
           aria-label="النص"
         />
-        <ImageInput images={images} onChange={setImages} />
+        <ImageInput images={images} onChange={setImages} allowPdf />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           {withHard ? (
             <Toggle checked={hard} onChange={setHard} label="🧠 مسألة صعبة" hint="يستخدم موديل أقوى (أبطأ شوي)" />
